@@ -51,7 +51,8 @@ class VescClient {
   int? _assist; // last-commanded assist level (no read-back exists on the X-9000)
 
   // --- hold-to-reverse (momentary; motion) ---
-  static const int reverseErpm = -1500; // conservative reverse creep; tune after wheel-off test
+  // SET_DUTY at a small negative duty = slow reverse creep (SET_RPM id 8 is repurposed on this fw).
+  static const double reverseDuty = -0.05; // ~5% duty; tune after the wheel-off test
   static const int _engageMaxErpm = 1200; // refuse to engage reverse while rolling faster than this
   bool _reverse = false;
   bool get reverseActive => _reverse;
@@ -115,7 +116,7 @@ class VescClient {
     if (!connected) return false;
     if (_erpm != null && _erpm!.abs() > _engageMaxErpm) return false;
     _reverse = true;
-    _send(Motor.setRpm(reverseErpm)); // immediate; poll loop resends as keep-alive
+    _send(Motor.setDuty(reverseDuty)); // immediate; poll loop resends as keep-alive
     return true;
   }
 
@@ -143,7 +144,7 @@ class VescClient {
         _reverse = false; // link lost — drop reverse; controller's own timeout zeroes the motor
         return;
       }
-      if (_reverse) _send(Motor.setRpm(reverseErpm)); // keep-alive (<1s VESC command timeout)
+      if (_reverse) _send(Motor.setDuty(reverseDuty)); // keep-alive (<1s VESC command timeout)
       requestValues();
       if (_tick % 8 == 0) terminal('tcstrength'); // read the ride mode ~every 1.6 s (read-only)
       _tick++;

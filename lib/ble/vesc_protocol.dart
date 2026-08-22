@@ -29,16 +29,23 @@ class Comm {
 }
 
 /// Native VESC motor commands. Motion — used only by the momentary hold-to-reverse control.
+///
+/// NOTE: COMM id 8 (SET_RPM) is REPURPOSED on X9KV3 — its handler doesn't drive the motor,
+/// it calls the mode/display broadcast (0x801ab80), so sending it does nothing to the wheel
+/// and toggles the ride mode. Reverse therefore uses SET_DUTY (id 5), which is a real handler
+/// (mc_interface_set_duty). Duty ~ speed under no load, so it's a predictable slow creep.
 class Motor {
-  /// Closed-loop speed. Negative erpm = reverse. Speed-limited (no off-load runaway),
-  /// and the controller's own command timeout zeroes it if keep-alive stops.
-  static Uint8List setRpm(int erpm) => Uint8List.fromList([
-        Comm.setRpm,
-        (erpm >> 24) & 0xFF,
-        (erpm >> 16) & 0xFF,
-        (erpm >> 8) & 0xFF,
-        erpm & 0xFF,
-      ]);
+  /// Duty-cycle control. duty in [-1, 1]; negative = reverse. VESC wire units: duty * 1e5.
+  static Uint8List setDuty(double duty) {
+    final v = (duty * 100000).round();
+    return Uint8List.fromList([
+      Comm.setDuty,
+      (v >> 24) & 0xFF,
+      (v >> 16) & 0xFF,
+      (v >> 8) & 0xFF,
+      v & 0xFF,
+    ]);
+  }
 
   /// SET_CURRENT 0 mA — releases the motor to coast (used on reverse release).
   static Uint8List release() => Uint8List.fromList([Comm.setCurrent, 0, 0, 0, 0]);

@@ -34,9 +34,9 @@ void main() {
     expect(a[5 + 1], 0xE4); // selector flag
   });
 
-  test('SET_RPM encodes negative erpm as i32 BE two-s complement', () {
-    // -1500 = 0xFFFFFA24
-    expect(Motor.setRpm(-1500), [Comm.setRpm, 0xFF, 0xFF, 0xFA, 0x24]);
+  test('SET_DUTY encodes negative duty as i32 BE (duty*1e5)', () {
+    // -0.05 * 1e5 = -5000 = 0xFFFFEC78
+    expect(Motor.setDuty(-0.05), [Comm.setDuty, 0xFF, 0xFF, 0xEC, 0x78]);
     expect(Motor.release(), [Comm.setCurrent, 0, 0, 0, 0]);
   });
 
