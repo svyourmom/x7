@@ -4,6 +4,8 @@
 // ConnectionManager (discovery/reconnect honouring device selection), merges telemetry, and
 // shows the dashboard with a route to Settings.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -57,12 +59,16 @@ class _HomePageState extends State<HomePage> {
   late final VescClient _vesc;
   late final BmsClient _bms;
   late final ConnectionManager _conn;
+  Timer? _freshTick; // repaints ~1s so time-based freshness (dots, control enable) stays honest
 
   Settings get _s => widget.settings;
 
   @override
   void initState() {
     super.initState();
+    _freshTick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
     _vesc = VescClient(
       onState: (s) => setState(() => _t.ctrl = s),
       onPrint: (line) => debugPrint('X9000: $line'),
@@ -92,6 +98,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _freshTick?.cancel();
     _s.removeListener(_onSettings);
     _conn.dispose();
     _vesc.disconnect();
