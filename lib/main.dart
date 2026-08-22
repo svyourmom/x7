@@ -1,17 +1,20 @@
 // x7 — app entry point.
 //
-// Wires up the two BLE clients (controller + BMS) into one merged telemetry model and
-// shows the dashboard. Scanning/permission flow is intentionally minimal here — the focus
-// of this skeleton is the data path and the UI shell. See CONTRIBUTING.md.
+// Creates the two BLE clients, hands them to the ConnectionManager (discovery + reconnect),
+// merges their callbacks into one Telemetry model, and shows the dashboard.
 
 import 'package:flutter/material.dart';
 
 import 'ble/bms_client.dart';
+import 'ble/connection_manager.dart';
 import 'ble/vesc_client.dart';
 import 'model/telemetry.dart';
 import 'ui/dashboard.dart';
 
-void main() => runApp(const X7App());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const X7App());
+}
 
 class X7App extends StatelessWidget {
   const X7App({super.key});
@@ -26,7 +29,7 @@ class X7App extends StatelessWidget {
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF0B0D10),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF35E0A1), // accent
+          primary: Color(0xFF35E0A1),
           surface: Color(0xFF14181D),
         ),
       ),
@@ -45,6 +48,7 @@ class _HomePageState extends State<HomePage> {
   final Telemetry _t = Telemetry();
   late final VescClient _vesc;
   late final BmsClient _bms;
+  late final ConnectionManager _conn;
 
   @override
   void initState() {
@@ -54,7 +58,17 @@ class _HomePageState extends State<HomePage> {
       onPrint: (line) => debugPrint('X9000: $line'),
     );
     _bms = BmsClient(onState: (s) => setState(() => _t.bms = s));
-    // TODO(contributor): scan + connect flow (permissions, device pick, auto-reconnect).
+    _conn = ConnectionManager(vesc: _vesc, bms: _bms, log: (m) => debugPrint('x7/ble: $m'));
+    // kick off discovery after first frame so context/permissions UI is ready
+    WidgetsBinding.instance.addPostFrameCallback((_) => _conn.start());
+  }
+
+  @override
+  void dispose() {
+    _conn.dispose();
+    _vesc.disconnect();
+    _bms.disconnect();
+    super.dispose();
   }
 
   @override
