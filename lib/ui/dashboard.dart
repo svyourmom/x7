@@ -142,14 +142,16 @@ class Dashboard extends StatelessWidget {
   }
 
   Widget _modes(CtrlState ctrl) {
+    final live = ctrl.fresh; // only actionable when the controller is connected
     return Row(children: [
-      _ModeCard('STREET', selected: ctrl.mode == 'street', onTap: () => onSetMode(false)),
+      _ModeCard('STREET', selected: ctrl.mode == 'street', enabled: live, onTap: () => onSetMode(false)),
       const SizedBox(width: 12),
-      _ModeCard('RACE', selected: ctrl.mode == 'race', onTap: () => onSetMode(true)),
+      _ModeCard('RACE', selected: ctrl.mode == 'race', enabled: live, onTap: () => onSetMode(true)),
     ]);
   }
 
   Widget _assist(CtrlState ctrl) {
+    final live = ctrl.fresh;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -161,6 +163,7 @@ class Dashboard extends StatelessWidget {
               child: _AssistButton(
                 level: l,
                 selected: ctrl.assist == l,
+                enabled: live,
                 onTap: () => onSetAssist(l),
               ),
             ),
@@ -229,14 +232,17 @@ class _Tile extends StatelessWidget {
 class _ModeCard extends StatelessWidget {
   final String label;
   final bool selected;
+  final bool enabled;
   final VoidCallback onTap;
-  const _ModeCard(this.label, {required this.selected, required this.onTap});
+  const _ModeCard(this.label, {required this.selected, required this.onTap, this.enabled = true});
   @override
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.35,
+        child: GestureDetector(
+        onTap: enabled ? onTap : null,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 20),
           decoration: BoxDecoration(
@@ -253,6 +259,7 @@ class _ModeCard extends StatelessWidget {
                   letterSpacing: 2)),
         ),
       ),
+      ),
     );
   }
 }
@@ -260,28 +267,33 @@ class _ModeCard extends StatelessWidget {
 class _AssistButton extends StatelessWidget {
   final int level;
   final bool selected;
+  final bool enabled;
   final VoidCallback onTap;
-  const _AssistButton({required this.level, required this.selected, required this.onTap});
+  const _AssistButton(
+      {required this.level, required this.selected, required this.onTap, this.enabled = true});
   @override
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        width: 52,
-        height: 44,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? accent : Colors.transparent,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: selected ? accent : Colors.white24, width: 1.5),
+    return Opacity(
+      opacity: enabled ? 1 : 0.35,
+      child: GestureDetector(
+        onTap: enabled ? onTap : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: 52,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: selected ? accent : Colors.white24, width: 1.5),
+          ),
+          child: Text('$level',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? const Color(0xFF0B0D10) : accent)),
         ),
-        child: Text('$level',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: selected ? const Color(0xFF0B0D10) : accent)),
       ),
     );
   }

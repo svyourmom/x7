@@ -99,13 +99,29 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
+  void _toast(String msg) {
+    final m = ScaffoldMessenger.of(context);
+    m.clearSnackBars();
+    m.showSnackBar(SnackBar(
+      content: Text(msg),
+      duration: const Duration(milliseconds: 1300),
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dashboard(
       telemetry: _t,
       settings: _s,
-      onSetMode: (race) => _vesc.setMode(race: race),
-      onSetAssist: (level) => _vesc.setAssist(level),
+      onSetMode: (race) async {
+        final ok = await _vesc.setMode(race: race);
+        _toast(ok ? 'Sent: ${race ? 'RACE' : 'STREET'} mode' : 'Controller not connected');
+      },
+      onSetAssist: (level) async {
+        final ok = await _vesc.setAssist(level);
+        _toast(ok ? 'Sent: Assist $level' : 'Controller not connected');
+      },
       onOpenSettings: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => SettingsScreen(settings: _s)),
       ),

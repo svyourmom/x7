@@ -80,22 +80,33 @@ class VescClient {
     await _device?.disconnect();
   }
 
-  Future<void> _send(List<int> payload) async {
-    final pkt = frame(payload);
-    for (int off = 0; off < pkt.length; off += 20) {
-      final end = (off + 20 < pkt.length) ? off + 20 : pkt.length;
-      await _rx!.write(pkt.sublist(off, end), withoutResponse: true);
+  /// Sends a framed payload. Returns false (rather than throwing) if the controller
+  /// isn't connected or the write fails, so control taps never fail silently.
+  Future<bool> _send(List<int> payload) async {
+    final rx = _rx;
+    if (!connected || rx == null) return false;
+    try {
+      final pkt = frame(payload);
+      for (int off = 0; off < pkt.length; off += 20) {
+        final end = (off + 20 < pkt.length) ? off + 20 : pkt.length;
+        await rx.write(pkt.sublist(off, end), withoutResponse: true);
+      }
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
   // --- commands ---
   Future<void> requestValues() => _send([Comm.getValues]);
   Future<void> terminal(String cmd) => _send([Comm.terminalCmd, ...cmd.codeUnits]);
-  Future<void> setMode({required bool race}) => _send(Ebmx.setMode(race: race));
-  Future<void> setAssist(int level) async {
-    await _send(Ebmx.setAssist(level));
+  Future<bool> setMode({required bool race}) => _send(Ebmx.setMode(race: race));
+  Future<bool> setAssist(int level) async {
+    final ok = await _send(Ebmx.setAssist(level));
+    if (!ok) return false;
     _assist = level; // optimistic: the controller exposes no assist read-back
     _emit();
+    return true;
   }
 
   // --- polling ---
