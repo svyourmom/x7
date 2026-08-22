@@ -26,78 +26,142 @@ class Dashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bms = telemetry.bms;
-    final ctrl = telemetry.ctrl;
-
     return Scaffold(
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
+          child: OrientationBuilder(
+            builder: (context, orientation) => orientation == Orientation.landscape
+                ? _landscape(context)
+                : _portrait(context),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Portrait: content anchored top, controls anchored bottom, flexible gap between.
+  Widget _portrait(BuildContext context) {
+    final bms = telemetry.bms;
+    final ctrl = telemetry.ctrl;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _header(),
+        const SizedBox(height: 28),
+        _heroRow(bms, ctrl),
+        const SizedBox(height: 28),
+        _tiles(bms, ctrl),
+        const Spacer(),
+        _modes(ctrl),
+        const SizedBox(height: 16),
+        _assist(),
+      ],
+    );
+  }
+
+  // Landscape (handlebar mount): readouts on the left, ride controls on the right, so the
+  // short height never overflows.
+  Widget _landscape(BuildContext context) {
+    final bms = telemetry.bms;
+    final ctrl = telemetry.ctrl;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _header(),
+        const SizedBox(height: 8),
+        Expanded(
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // header: title · connection · settings
-              Row(
-                children: [
-                  const Text('x7', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-                  const Spacer(),
-                  _Dot(label: 'BMS', ok: bms.fresh),
-                  const SizedBox(width: 12),
-                  _Dot(label: 'X-9000', ok: ctrl.fresh),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.settings, color: Colors.white54),
-                    onPressed: onOpenSettings,
-                    tooltip: 'Settings',
-                  ),
-                ],
+              Expanded(
+                flex: 3,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _heroRow(bms, ctrl),
+                    const SizedBox(height: 20),
+                    _tiles(bms, ctrl),
+                  ],
+                ),
               ),
-
-              const SizedBox(height: 28),
-              // hero: SOC + speed
-              Row(
-                children: [
-                  Expanded(child: _Hero(label: 'SOC', value: _pct(bms.soc))),
-                  Expanded(child: _Hero(label: settings.speedUnit, value: _speed(ctrl.erpm))),
-                ],
-              ),
-
-              const SizedBox(height: 28),
-              // stat tiles
-              Row(children: [
-                _Tile('POWER', _power(ctrl)),
-                _Tile('PACK', _fmt(bms.packV, ' V', 1)),
-                _Tile('MOTOR ${settings.tempUnit}', settings.temp(ctrl.motorC)),
-                _Tile('FET ${settings.tempUnit}', settings.temp(ctrl.fetC)),
-              ]),
-
-              const Spacer(),
-              // ride-mode cards
-              Row(children: [
-                _ModeCard('STREET', selected: ctrl.mode == 'street', onTap: () => onSetMode(false)),
-                const SizedBox(width: 12),
-                _ModeCard('RACE', selected: ctrl.mode == 'race', onTap: () => onSetMode(true)),
-              ]),
-
-              const SizedBox(height: 16),
-              // assist strip
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('ASSIST', style: TextStyle(color: Colors.white54, letterSpacing: 2)),
-                  Row(children: [
-                    for (final l in [1, 2, 3])
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: OutlinedButton(onPressed: () => onSetAssist(l), child: Text('$l')),
-                      ),
-                  ]),
-                ],
+              const SizedBox(width: 20),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _modes(ctrl),
+                    const SizedBox(height: 16),
+                    _assist(),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-      ),
+      ],
+    );
+  }
+
+  // header: title · connection · settings
+  Widget _header() {
+    return Row(
+      children: [
+        const Text('x7', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+        const Spacer(),
+        _Dot(label: 'BMS', ok: telemetry.bms.fresh),
+        const SizedBox(width: 12),
+        _Dot(label: 'X-9000', ok: telemetry.ctrl.fresh),
+        const SizedBox(width: 8),
+        IconButton(
+          icon: const Icon(Icons.settings, color: Colors.white54),
+          onPressed: onOpenSettings,
+          tooltip: 'Settings',
+        ),
+      ],
+    );
+  }
+
+  Widget _heroRow(BmsState bms, CtrlState ctrl) {
+    return Row(
+      children: [
+        Expanded(child: _Hero(label: 'SOC', value: _pct(bms.soc))),
+        Expanded(child: _Hero(label: settings.speedUnit, value: _speed(ctrl.erpm))),
+      ],
+    );
+  }
+
+  Widget _tiles(BmsState bms, CtrlState ctrl) {
+    return Row(children: [
+      _Tile('POWER', _power(ctrl)),
+      _Tile('PACK', _fmt(bms.packV, ' V', 1)),
+      _Tile('MOTOR ${settings.tempUnit}', settings.temp(ctrl.motorC)),
+      _Tile('FET ${settings.tempUnit}', settings.temp(ctrl.fetC)),
+    ]);
+  }
+
+  Widget _modes(CtrlState ctrl) {
+    return Row(children: [
+      _ModeCard('STREET', selected: ctrl.mode == 'street', onTap: () => onSetMode(false)),
+      const SizedBox(width: 12),
+      _ModeCard('RACE', selected: ctrl.mode == 'race', onTap: () => onSetMode(true)),
+    ]);
+  }
+
+  Widget _assist() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text('ASSIST', style: TextStyle(color: Colors.white54, letterSpacing: 2)),
+        Row(children: [
+          for (final l in [1, 2, 3])
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: OutlinedButton(onPressed: () => onSetAssist(l), child: Text('$l')),
+            ),
+        ]),
+      ],
     );
   }
 
