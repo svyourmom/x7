@@ -13,6 +13,8 @@ class Dashboard extends StatelessWidget {
   final Settings settings;
   final void Function(bool race) onSetMode;
   final void Function(int level) onSetAssist;
+  final VoidCallback onReverseStart;
+  final VoidCallback onReverseStop;
   final VoidCallback onOpenSettings;
 
   const Dashboard({
@@ -21,6 +23,8 @@ class Dashboard extends StatelessWidget {
     required this.settings,
     required this.onSetMode,
     required this.onSetAssist,
+    required this.onReverseStart,
+    required this.onReverseStop,
     required this.onOpenSettings,
   });
 
@@ -56,6 +60,8 @@ class Dashboard extends StatelessWidget {
         _modes(ctrl),
         const SizedBox(height: 16),
         _assist(ctrl),
+        const SizedBox(height: 12),
+        _reverse(ctrl),
       ],
     );
   }
@@ -94,6 +100,8 @@ class Dashboard extends StatelessWidget {
                     _modes(ctrl),
                     const SizedBox(height: 16),
                     _assist(ctrl),
+                    const SizedBox(height: 12),
+                    _reverse(ctrl),
                   ],
                 ),
               ),
@@ -148,6 +156,14 @@ class Dashboard extends StatelessWidget {
       const SizedBox(width: 12),
       _ModeCard('RACE', selected: ctrl.mode == 'race', enabled: live, onTap: () => onSetMode(true)),
     ]);
+  }
+
+  Widget _reverse(CtrlState ctrl) {
+    return _ReverseButton(
+      enabled: ctrl.fresh,
+      onStart: onReverseStart,
+      onStop: onReverseStop,
+    );
   }
 
   Widget _assist(CtrlState ctrl) {
@@ -259,6 +275,70 @@ class _ModeCard extends StatelessWidget {
                   letterSpacing: 2)),
         ),
       ),
+      ),
+    );
+  }
+}
+
+// Momentary hold-to-reverse. Spins only while the pointer is down; releases (coast) on up,
+// cancel, or dispose. Colour goes solid red while active.
+class _ReverseButton extends StatefulWidget {
+  final bool enabled;
+  final VoidCallback onStart;
+  final VoidCallback onStop;
+  const _ReverseButton({required this.enabled, required this.onStart, required this.onStop});
+  @override
+  State<_ReverseButton> createState() => _ReverseButtonState();
+}
+
+class _ReverseButtonState extends State<_ReverseButton> {
+  static const _red = Color(0xFFE0483B);
+  bool _held = false;
+
+  void _down() {
+    if (!widget.enabled || _held) return;
+    setState(() => _held = true);
+    widget.onStart();
+  }
+
+  void _up() {
+    if (!_held) return;
+    setState(() => _held = false);
+    widget.onStop();
+  }
+
+  @override
+  void dispose() {
+    if (_held) widget.onStop(); // never leave reverse engaged if the screen goes away mid-press
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: widget.enabled ? 1 : 0.35,
+      child: Listener(
+        onPointerDown: (_) => _down(),
+        onPointerUp: (_) => _up(),
+        onPointerCancel: (_) => _up(),
+        child: Container(
+          height: 52,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _held ? _red : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _red, width: 1.5),
+          ),
+          child: Text(
+            _held ? 'REVERSING…' : 'HOLD TO REVERSE',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 2,
+              color: _held ? Colors.white : _red,
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -14,6 +14,8 @@ import 'dart:typed_data';
 class Comm {
   static const int fwVersion = 0;
   static const int getValues = 4;
+  static const int setCurrent = 6; // motor command — reverse uses this to release (0 A = coast)
+  static const int setRpm = 8; // motor command — closed-loop speed (reverse creep)
   static const int getMcconf = 14;
   static const int getAppconf = 17;
   static const int terminalCmd = 20;
@@ -24,6 +26,22 @@ class Comm {
   static const int bmsGetValues = 96;
   // Implemented by the optional x7-vesc firmware patch (CAN-RX injector):
   static const int bmsFwdCanRx = 113;
+}
+
+/// Native VESC motor commands. Motion — used only by the momentary hold-to-reverse control.
+class Motor {
+  /// Closed-loop speed. Negative erpm = reverse. Speed-limited (no off-load runaway),
+  /// and the controller's own command timeout zeroes it if keep-alive stops.
+  static Uint8List setRpm(int erpm) => Uint8List.fromList([
+        Comm.setRpm,
+        (erpm >> 24) & 0xFF,
+        (erpm >> 16) & 0xFF,
+        (erpm >> 8) & 0xFF,
+        erpm & 0xFF,
+      ]);
+
+  /// SET_CURRENT 0 mA — releases the motor to coast (used on reverse release).
+  static Uint8List release() => Uint8List.fromList([Comm.setCurrent, 0, 0, 0, 0]);
 }
 
 int crc16(List<int> data) {

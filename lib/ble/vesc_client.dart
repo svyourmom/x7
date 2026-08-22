@@ -50,6 +50,12 @@ class VescClient {
   String? _mode; // 'street' | 'race'
   int? _assist; // last-commanded assist level (no read-back exists on the X-9000)
 
+  // --- hold-to-reverse (momentary; motion) ---
+  static const int reverseErpm = -1500; // conservative reverse creep; tune after wheel-off test
+  static const int _engageMaxErpm = 1200; // refuse to engage reverse while rolling faster than this
+  bool _reverse = false;
+  bool get reverseActive => _reverse;
+
   final void Function(CtrlState) onState;
   final void Function(String line) onPrint;
   VescClient({required this.onState, required this.onPrint});
@@ -75,6 +81,7 @@ class VescClient {
   }
 
   Future<void> disconnect() async {
+    stopReverse(); // never leave the motor commanded
     _pollTimer?.cancel();
     await _notifySub?.cancel();
     await _device?.disconnect();
@@ -101,6 +108,24 @@ class VescClient {
   Future<void> requestValues() => _send([Comm.getValues]);
   Future<void> terminal(String cmd) => _send([Comm.terminalCmd, ...cmd.codeUnits]);
   Future<bool> setMode({required bool race}) => _send(Ebmx.setMode(race: race));
+
+  /// Engage momentary reverse. Only while the button is held. Refuses if disconnected or
+  /// if the wheel is already rolling above [_engageMaxErpm]. The poll loop keeps it alive.
+  bool startReverse() {
+    if (!connected) return false;
+    if (_erpm != null && _erpm!.abs() > _engageMaxErpm) return false;
+    _reverse = true;
+    _send(Motor.setRpm(reverseErpm)); // immediate; poll loop resends as keep-alive
+    return true;
+  }
+
+  /// Release reverse — coast the motor. Safe to call redundantly. Also invoked on
+  /// disconnect/dispose so the motor never stays commanded.
+  void stopReverse() {
+    final was = _reverse;
+    _reverse = false;
+    if (was && connected) _send(Motor.release());
+  }
   Future<bool> setAssist(int level) async {
     final ok = await _send(Ebmx.setAssist(level));
     if (!ok) return false;
@@ -114,7 +139,11 @@ class VescClient {
     _pollTimer?.cancel();
     _tick = 0;
     _pollTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      if (!connected) return;
+      if (!connected) {
+        _reverse = false; // link lost — drop reverse; controller's own timeout zeroes the motor
+        return;
+      }
+      if (_reverse) _send(Motor.setRpm(reverseErpm)); // keep-alive (<1s VESC command timeout)
       requestValues();
       if (_tick % 8 == 0) terminal('tcstrength'); // read the ride mode ~every 1.6 s (read-only)
       _tick++;
