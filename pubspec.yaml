@@ -1,0 +1,23 @@
+name: x7
+description: Open dashboard & control center for Talaria (Greenway BMS + EBMX X-9000) over Bluetooth.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # BLE central supporting multiple simultaneous connections (BMS + controller)
+  flutter_blue_plus: ^1.32.0
+  # runtime permission requests (Bluetooth/location on Android)
+  permission_handler: ^11.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

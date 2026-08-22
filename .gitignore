@@ -1,0 +1,26 @@
+# --- deploy key / secrets (NEVER commit) ---
+id_ed25519
+id_ed25519.pub
+known_hosts
+*.pem
+*.key
+
+# --- Flutter / Dart ---
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+.pub-cache/
+.pub/
+*.iml
+.idea/
+.gradle/
+local.properties
+key.properties
+*.jks
+*.keystore
+
+# --- OS ---
+.DS_Store
+Thumbs.db
