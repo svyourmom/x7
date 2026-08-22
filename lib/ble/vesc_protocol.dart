@@ -14,8 +14,9 @@ import 'dart:typed_data';
 class Comm {
   static const int fwVersion = 0;
   static const int getValues = 4;
+  static const int setDuty = 5; // motor command — reverse creep (duty ~ speed under no load)
   static const int setCurrent = 6; // motor command — reverse uses this to release (0 A = coast)
-  static const int setRpm = 8; // motor command — closed-loop speed (reverse creep)
+  static const int setRpm = 8; // REPURPOSED on X9KV3 (mode/display broadcast, not set_pid_speed)
   static const int getMcconf = 14;
   static const int getAppconf = 17;
   static const int terminalCmd = 20;
