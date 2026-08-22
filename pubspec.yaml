@@ -13,6 +13,10 @@ dependencies:
   flutter_blue_plus: ^1.32.0
   # runtime permission requests (Bluetooth/location on Android)
   permission_handler: ^11.3.0
+  # persisted user settings (units, keep-screen-on, chosen devices)
+  shared_preferences: ^2.2.3
+  # keep the screen awake (dashboard use on the bike)
+  wakelock_plus: ^1.2.5
 
 dev_dependencies:
   flutter_test:

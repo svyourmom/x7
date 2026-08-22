@@ -1,28 +1,33 @@
 // x7 dashboard — Stark-Varg-inspired shell.
 //
 // Dark, minimal, big central readouts, ride-mode cards, a row of stat tiles, and a control
-// strip. This is a starting point meant to grow with contributions (charts, gauges, config).
+// strip. Units follow Settings (metric/imperial). Layout is anchored top + bottom with a
+// flexible gap so it reads well in portrait.
 
 import 'package:flutter/material.dart';
 import '../model/telemetry.dart';
+import '../settings.dart';
 
 class Dashboard extends StatelessWidget {
   final Telemetry telemetry;
+  final Settings settings;
   final void Function(bool race) onSetMode;
   final void Function(int level) onSetAssist;
+  final VoidCallback onOpenSettings;
 
   const Dashboard({
     super.key,
     required this.telemetry,
+    required this.settings,
     required this.onSetMode,
     required this.onSetAssist,
+    required this.onOpenSettings,
   });
 
   @override
   Widget build(BuildContext context) {
     final bms = telemetry.bms;
     final ctrl = telemetry.ctrl;
-    final race = ctrl.mode == 'race';
 
     return Scaffold(
       body: SafeArea(
@@ -31,7 +36,7 @@ class Dashboard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // header: connection status
+              // header: title · connection · settings
               Row(
                 children: [
                   const Text('x7', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
@@ -39,39 +44,43 @@ class Dashboard extends StatelessWidget {
                   _Dot(label: 'BMS', ok: bms.fresh),
                   const SizedBox(width: 12),
                   _Dot(label: 'X-9000', ok: ctrl.fresh),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.settings, color: Colors.white54),
+                    onPressed: onOpenSettings,
+                    tooltip: 'Settings',
+                  ),
                 ],
               ),
-              const SizedBox(height: 24),
 
-              // hero: SoC + speed
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(child: _Hero(label: 'SOC', value: _fmt(bms.soc, '%', 0))),
-                    Expanded(child: _Hero(label: 'KM/H', value: _speed(ctrl.erpm))),
-                  ],
-                ),
+              const SizedBox(height: 28),
+              // hero: SOC + speed
+              Row(
+                children: [
+                  Expanded(child: _Hero(label: 'SOC', value: _pct(bms.soc))),
+                  Expanded(child: _Hero(label: settings.speedUnit, value: _speed(ctrl.erpm))),
+                ],
               ),
 
+              const SizedBox(height: 28),
               // stat tiles
-              const SizedBox(height: 12),
               Row(children: [
                 _Tile('POWER', _power(ctrl)),
                 _Tile('PACK', _fmt(bms.packV, ' V', 1)),
-                _Tile('MOTOR °C', _fmt(ctrl.motorC, '', 0)),
-                _Tile('FET °C', _fmt(ctrl.fetC, '', 0)),
+                _Tile('MOTOR ${settings.tempUnit}', settings.temp(ctrl.motorC)),
+                _Tile('FET ${settings.tempUnit}', settings.temp(ctrl.fetC)),
               ]),
 
+              const Spacer(),
               // ride-mode cards
-              const SizedBox(height: 20),
               Row(children: [
                 _ModeCard('STREET', selected: ctrl.mode == 'street', onTap: () => onSetMode(false)),
                 const SizedBox(width: 12),
-                _ModeCard('RACE', selected: race, onTap: () => onSetMode(true)),
+                _ModeCard('RACE', selected: ctrl.mode == 'race', onTap: () => onSetMode(true)),
               ]),
 
-              // assist strip
               const SizedBox(height: 16),
+              // assist strip
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -92,16 +101,22 @@ class Dashboard extends StatelessWidget {
     );
   }
 
+  static String _pct(double? v) => v == null ? '--' : '${v.round()}%';
   static String _fmt(double? v, String unit, int dp) =>
       v == null ? '--' : '${v.toStringAsFixed(dp)}$unit';
 
-  static String _power(CtrlState c) {
+  String _power(CtrlState c) {
     if (c.inputV == null || c.inputA == null) return '--';
     return '${(c.inputV! * c.inputA!).toStringAsFixed(0)} W';
   }
 
-  // erpm -> km/h needs pole pairs + wheel/gearing; left as a stub for calibration.
-  static String _speed(int? erpm) => erpm == null ? '--' : '${(erpm.abs() / 1000).round()}';
+  // erpm -> speed needs pole pairs + wheel/gearing (calibration TODO). Placeholder in the
+  // chosen unit; shows 0 when parked.
+  String _speed(int? erpm) {
+    if (erpm == null) return '--';
+    final kmh = erpm.abs() / 1000.0; // uncalibrated stub
+    return '${settings.speed(kmh)!.round()}';
+  }
 }
 
 class _Hero extends StatelessWidget {
@@ -110,9 +125,10 @@ class _Hero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(value, style: const TextStyle(fontSize: 64, fontWeight: FontWeight.w800)),
+        Text(value, style: const TextStyle(fontSize: 60, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 2),
         Text(label, style: const TextStyle(color: Colors.white38, letterSpacing: 3)),
       ],
     );
@@ -156,7 +172,7 @@ class _ModeCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 20),
           decoration: BoxDecoration(
-            color: selected ? accent.withOpacity(0.15) : const Color(0xFF14181D),
+            color: selected ? accent.withValues(alpha: 0.15) : const Color(0xFF14181D),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: selected ? accent : Colors.white12, width: 1.5),
           ),
@@ -179,7 +195,7 @@ class _Dot extends StatelessWidget {
   const _Dot({required this.label, required this.ok});
   @override
   Widget build(BuildContext context) {
-    return Row(children: [
+    return Row(mainAxisSize: MainAxisSize.min, children: [
       Container(
         width: 8,
         height: 8,

@@ -1,23 +1,30 @@
 // x7 — app entry point.
 //
-// Creates the two BLE clients, hands them to the ConnectionManager (discovery + reconnect),
-// merges their callbacks into one Telemetry model, and shows the dashboard.
+// Loads settings, applies the keep-screen-on preference, creates the two BLE clients + the
+// ConnectionManager (discovery/reconnect honouring device selection), merges telemetry, and
+// shows the dashboard with a route to Settings.
 
 import 'package:flutter/material.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'ble/bms_client.dart';
 import 'ble/connection_manager.dart';
 import 'ble/vesc_client.dart';
 import 'model/telemetry.dart';
+import 'settings.dart';
 import 'ui/dashboard.dart';
+import 'ui/settings_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const X7App());
+  final settings = Settings();
+  await settings.load();
+  runApp(X7App(settings: settings));
 }
 
 class X7App extends StatelessWidget {
-  const X7App({super.key});
+  final Settings settings;
+  const X7App({super.key, required this.settings});
 
   @override
   Widget build(BuildContext context) {
@@ -33,13 +40,14 @@ class X7App extends StatelessWidget {
           surface: Color(0xFF14181D),
         ),
       ),
-      home: const HomePage(),
+      home: HomePage(settings: settings),
     );
   }
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final Settings settings;
+  const HomePage({super.key, required this.settings});
   @override
   State<HomePage> createState() => _HomePageState();
 }
@@ -50,6 +58,8 @@ class _HomePageState extends State<HomePage> {
   late final BmsClient _bms;
   late final ConnectionManager _conn;
 
+  Settings get _s => widget.settings;
+
   @override
   void initState() {
     super.initState();
@@ -58,13 +68,31 @@ class _HomePageState extends State<HomePage> {
       onPrint: (line) => debugPrint('X9000: $line'),
     );
     _bms = BmsClient(onState: (s) => setState(() => _t.bms = s));
-    _conn = ConnectionManager(vesc: _vesc, bms: _bms, log: (m) => debugPrint('x7/ble: $m'));
-    // kick off discovery after first frame so context/permissions UI is ready
+    _conn = ConnectionManager(
+      vesc: _vesc,
+      bms: _bms,
+      settings: _s,
+      log: (m) => debugPrint('x7/ble: $m'),
+    );
+    _s.addListener(_onSettings);
+    _applyWakelock();
     WidgetsBinding.instance.addPostFrameCallback((_) => _conn.start());
+  }
+
+  void _onSettings() {
+    _applyWakelock();
+    setState(() {}); // units may have changed
+  }
+
+  Future<void> _applyWakelock() async {
+    try {
+      await WakelockPlus.toggle(enable: _s.keepScreenOn);
+    } catch (_) {}
   }
 
   @override
   void dispose() {
+    _s.removeListener(_onSettings);
     _conn.dispose();
     _vesc.disconnect();
     _bms.disconnect();
@@ -75,8 +103,12 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Dashboard(
       telemetry: _t,
+      settings: _s,
       onSetMode: (race) => _vesc.setMode(race: race),
       onSetAssist: (level) => _vesc.setAssist(level),
+      onOpenSettings: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => SettingsScreen(settings: _s)),
+      ),
     );
   }
 }
