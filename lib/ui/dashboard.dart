@@ -55,7 +55,7 @@ class Dashboard extends StatelessWidget {
         const Spacer(),
         _modes(ctrl),
         const SizedBox(height: 16),
-        _assist(),
+        _assist(ctrl),
       ],
     );
   }
@@ -93,7 +93,7 @@ class Dashboard extends StatelessWidget {
                   children: [
                     _modes(ctrl),
                     const SizedBox(height: 16),
-                    _assist(),
+                    _assist(ctrl),
                   ],
                 ),
               ),
@@ -149,7 +149,7 @@ class Dashboard extends StatelessWidget {
     ]);
   }
 
-  Widget _assist() {
+  Widget _assist(CtrlState ctrl) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -158,7 +158,11 @@ class Dashboard extends StatelessWidget {
           for (final l in [1, 2, 3])
             Padding(
               padding: const EdgeInsets.only(left: 8),
-              child: OutlinedButton(onPressed: () => onSetAssist(l), child: Text('$l')),
+              child: _AssistButton(
+                level: l,
+                selected: ctrl.assist == l,
+                onTap: () => onSetAssist(l),
+              ),
             ),
         ]),
       ],
@@ -248,6 +252,36 @@ class _ModeCard extends StatelessWidget {
                   color: selected ? accent : Colors.white70,
                   letterSpacing: 2)),
         ),
+      ),
+    );
+  }
+}
+
+class _AssistButton extends StatelessWidget {
+  final int level;
+  final bool selected;
+  final VoidCallback onTap;
+  const _AssistButton({required this.level, required this.selected, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 52,
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: selected ? accent : Colors.white24, width: 1.5),
+        ),
+        child: Text('$level',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: selected ? const Color(0xFF0B0D10) : accent)),
       ),
     );
   }

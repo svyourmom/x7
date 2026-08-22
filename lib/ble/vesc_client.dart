@@ -48,6 +48,7 @@ class VescClient {
   double? _motorA, _inputA, _duty, _inputV, _fetC, _motorC;
   List<String> _faults = const [];
   String? _mode; // 'street' | 'race'
+  int? _assist; // last-commanded assist level (no read-back exists on the X-9000)
 
   final void Function(CtrlState) onState;
   final void Function(String line) onPrint;
@@ -57,6 +58,7 @@ class VescClient {
 
   Future<void> connect(BluetoothDevice device) async {
     _device = device;
+    _assist = null; // no read-back; don't carry a stale commanded level across connections
     await device.connect(autoConnect: false, timeout: const Duration(seconds: 20));
     final services = await device.discoverServices();
     for (final s in services) {
@@ -90,7 +92,11 @@ class VescClient {
   Future<void> requestValues() => _send([Comm.getValues]);
   Future<void> terminal(String cmd) => _send([Comm.terminalCmd, ...cmd.codeUnits]);
   Future<void> setMode({required bool race}) => _send(Ebmx.setMode(race: race));
-  Future<void> setAssist(int level) => _send(Ebmx.setAssist(level));
+  Future<void> setAssist(int level) async {
+    await _send(Ebmx.setAssist(level));
+    _assist = level; // optimistic: the controller exposes no assist read-back
+    _emit();
+  }
 
   // --- polling ---
   void _startPolling() {
@@ -114,6 +120,7 @@ class VescClient {
       fetC: _fetC,
       motorC: _motorC,
       mode: _mode,
+      assist: _assist,
       faults: _faults,
       updated: DateTime.now(),
     ));
