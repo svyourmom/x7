@@ -17,13 +17,21 @@ void main() {
     expect(out.first, payload);
   });
 
-  test('CAN-RX injector packet for set-mode (0x5E4EA3, data[6]=mode)', () {
+  test('CAN-RX injector packet for set-mode (handlebar 0x03003203, data[0]=mode)', () {
+    // [113][03 00 32 03][8 data], data[0] = 2 (Race) / 1 (Street).
+    // Emulates the handlebar so both the ride flag and the display byte move.
     final race = Ebmx.setMode(race: true);
-    // [113][00 5E 4E A3][8 data], data[6] = 2
     expect(race[0], Comm.bmsFwdCanRx);
-    expect(race.sublist(1, 5), [0x00, 0x5E, 0x4E, 0xA3]);
-    expect(race[5 + 6], 2);
-    expect(Ebmx.setMode(race: false)[5 + 6], 0);
+    expect(race.sublist(1, 5), [0x03, 0x00, 0x32, 0x03]);
+    expect(race[5 + 0], 2);
+    expect(Ebmx.setMode(race: false)[5 + 0], 1);
+  });
+
+  test('CAN-RX injector packet for set-assist (handlebar 0x03003201)', () {
+    final a = Ebmx.setAssist(2);
+    expect(a.sublist(1, 5), [0x03, 0x00, 0x32, 0x01]);
+    expect(a[5 + 0], 2); // level
+    expect(a[5 + 1], 0xE4); // selector flag
   });
 
   test('BMS read request framing (BatteryVoltage, param 9)', () {

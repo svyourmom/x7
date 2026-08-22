@@ -103,12 +103,22 @@ Uint8List canRxInject(int extId, List<int> data8) {
 }
 
 /// EBMX proprietary CAN command helpers (see x7-vesc docs/02-ebmx-can-protocol.md).
+///
+/// These emulate the handlebar module, which drives the bike over the priority-prefixed
+/// `0x0300_32xx` id family. Empirically (garagepc, X9KV3), the older `0x5E4EA3` mode path
+/// set only the ride-mode flag (`0x2001c8c0`, what `tcstrength` reads) but NOT the display
+/// byte (`0x1000000c`) — its `set_displays_mode` call is behind a gate that stays shut over
+/// injection — so the bike kept *reporting* the old mode. Node `0x3203` calls
+/// `set_displays_mode` directly and moves both, matching the physical button.
 class Ebmx {
-  /// Ride mode via 0x5E4EA3: data[6] = flag (0 = Street, non-zero = Race).
+  /// Ride mode via handlebar node 0x03003203: data[0] = 1 (Street) / 2 (Race).
+  /// Updates both the ride-mode flag and the display byte (verified: prints
+  /// "set displays_mode 0/1" and flips `tcstrength mode=`).
   static Uint8List setMode({required bool race}) =>
-      canRxInject(0x5E4EA3, [0, 0, 0, 0, 0, 0, race ? 2 : 0, 0]);
+      canRxInject(0x03003203, [race ? 2 : 1, 0, 0, 0, 0, 0, 0, 0]);
 
-  /// Assist level via 0x5E4EB0: data[0] = level.
+  /// Assist level via handlebar node 0x03003201: data[0] = level (1..3),
+  /// data[1] = 0xE4 selector flag.
   static Uint8List setAssist(int level) =>
-      canRxInject(0x5E4EB0, [level & 0xFF, 0, 0, 0, 0, 0, 0, 0]);
+      canRxInject(0x03003201, [level & 0xFF, 0xE4, 0, 0, 0, 0, 0, 0]);
 }
