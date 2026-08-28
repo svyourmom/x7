@@ -23,6 +23,8 @@ class Comm {
   static const int comPrint = 21; // controller -> host terminal output
   static const int getValuesSetup = 47;
   static const int getValuesSetupSelective = 51;
+  static const int getValuesSelective = 50; // GET_VALUES field subset by 32-bit mask
+
   static const int pingCan = 62;
   static const int bmsGetValues = 96;
   // Implemented by the optional x7-vesc firmware patch (CAN-RX injector):
@@ -144,7 +146,48 @@ class Ebmx {
       canRxInject(0x03003203, [race ? 2 : 1, 0, 0, 0, 0, 0, 0, 0]);
 
   /// Assist level via handlebar node 0x03003201: data[0] = level (1..3),
-  /// data[1] = 0xE4 selector flag.
+  /// data[1] = 0xE4 selector flag. (Distinct from the gear/level selector below.)
   static Uint8List setAssist(int level) =>
       canRxInject(0x03003201, [level & 0xFF, 0xE4, 0, 0, 0, 0, 0, 0]);
+
+  // --- Gear / level (the SW102T display's up/down selection) ---
+  // Emulates the display's level frame 0x5E4EB0. data[0] = level byte.
+  // NOTE: with a physical display connected this is OVERWRITTEN within ~50-400ms
+  // (the display re-broadcasts every ~20-35ms). It STICKS only when the display is
+  // disconnected — then the app is the sole level source. See x7-vesc docs/08.
+  static const int gearReverse = 0xFF;
+  static const int gearNeutral = 0x00;
+  static const int gearOff = 0x00; // alias: level 0 does not drive
+
+  /// Set gear/level via 0x5E4EB0. level: 0xFF=Reverse, 0=neutral/off, 1..3 = gears.
+  static Uint8List setGear(int level) =>
+      canRxInject(0x005E4EB0, [level & 0xFF, 0, 0, 0, 0, 0, 0, 0]);
+
+  // --- Reading gear + mode back (works with or without the injector patch) ---
+  // GET_VALUES_SELECTIVE (50) with mask (1<<24)|(1<<25): reply is
+  //   [50][mask:u32 BE][mode:u8][level:s8]
+  static const int selMask = (1 << 24) | (1 << 25); // 0x03000000
+
+  static Uint8List readGearMode() => Uint8List.fromList([
+        Comm.getValuesSelective,
+        (selMask >> 24) & 0xFF,
+        (selMask >> 16) & 0xFF,
+        (selMask >> 8) & 0xFF,
+        selMask & 0xFF,
+      ]);
+
+  /// Decode the two custom bytes from a selective reply payload (excludes the id).
+  /// Returns (mode, gearName) or null if the reply is too short.
+  /// Level byte: -1=Reverse, 0=neutral, 3/6/9 = gear 1/2/3.
+  static ({String mode, String gear})? decodeGearMode(List<int> pl) {
+    if (pl.length < 7) return null; // [50][4 mask][mode][level]
+    final modeByte = pl[5];
+    int lvl = pl[6];
+    if (lvl > 127) lvl -= 256; // s8
+    const gearNames = {-1: 'R', 0: 'N', 3: '1', 6: '2', 9: '3'};
+    return (
+      mode: modeByte == 1 ? 'race' : 'street',
+      gear: gearNames[lvl] ?? '?',
+    );
+  }
 }

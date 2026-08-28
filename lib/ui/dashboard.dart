@@ -13,6 +13,7 @@ class Dashboard extends StatelessWidget {
   final Settings settings;
   final void Function(bool race) onSetMode;
   final void Function(int level) onSetAssist;
+  final void Function(int level) onSetGear; // 0xFF=R, 0=N, 1..3 gears (0x5E4EB0)
   final VoidCallback onReverseStart;
   final VoidCallback onReverseStop;
   final VoidCallback onOpenSettings;
@@ -23,6 +24,7 @@ class Dashboard extends StatelessWidget {
     required this.settings,
     required this.onSetMode,
     required this.onSetAssist,
+    required this.onSetGear,
     required this.onReverseStart,
     required this.onReverseStop,
     required this.onOpenSettings,
@@ -58,6 +60,8 @@ class Dashboard extends StatelessWidget {
         _tiles(bms, ctrl),
         const Spacer(),
         _modes(ctrl),
+        const SizedBox(height: 16),
+        _gear(ctrl),
         const SizedBox(height: 16),
         _assist(ctrl),
         const SizedBox(height: 12),
@@ -100,6 +104,8 @@ class Dashboard extends StatelessWidget {
                     _modes(ctrl),
                     const SizedBox(height: 16),
                     _assist(ctrl),
+                    const SizedBox(height: 12),
+                    _gear(ctrl),
                     const SizedBox(height: 12),
                     _reverse(ctrl),
                   ],
@@ -181,6 +187,34 @@ class Dashboard extends StatelessWidget {
                 selected: ctrl.assist == l,
                 enabled: live,
                 onTap: () => onSetAssist(l),
+              ),
+            ),
+        ]),
+      ],
+    );
+  }
+
+  // Gear/level selector (0x5E4EB0). Shows the live gear read back on selective bit 25.
+  // Setting a gear needs the CAN-RX injector; it holds only with the display disconnected.
+  Widget _gear(CtrlState ctrl) {
+    final live = ctrl.fresh;
+    // (label, level byte). R=reverse(0xFF), N=neutral(0), 1..3 gears.
+    const items = [('R', 0xFF), ('N', 0), ('1', 1), ('2', 2), ('3', 3)];
+    // map the read-back gear char to the label we highlight
+    final cur = ctrl.gear; // 'R','N','1','2','3' or null
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text('GEAR', style: TextStyle(color: Colors.white54, letterSpacing: 2)),
+        Row(children: [
+          for (final it in items)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: _GearButton(
+                label: it.$1,
+                selected: cur == it.$1,
+                enabled: live,
+                onTap: () => onSetGear(it.$2),
               ),
             ),
         ]),
@@ -369,6 +403,42 @@ class _AssistButton extends StatelessWidget {
             border: Border.all(color: selected ? accent : Colors.white24, width: 1.5),
           ),
           child: Text('$level',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? const Color(0xFF0B0D10) : accent)),
+        ),
+      ),
+    );
+  }
+}
+
+class _GearButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _GearButton(
+      {required this.label, required this.selected, required this.onTap, this.enabled = true});
+  @override
+  Widget build(BuildContext context) {
+    final isRev = label == 'R';
+    final accent = isRev ? const Color(0xFFE0574B) : Theme.of(context).colorScheme.primary;
+    return Opacity(
+      opacity: enabled ? 1 : 0.35,
+      child: GestureDetector(
+        onTap: enabled ? onTap : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: 46,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: selected ? accent : Colors.white24, width: 1.5),
+          ),
+          child: Text(label,
               style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,

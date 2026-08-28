@@ -138,6 +138,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final ok = await _vesc.setAssist(level);
         _toast(ok ? 'Sent: Assist $level' : 'Controller not connected');
       },
+      onSetGear: (level) async {
+        final ok = await _vesc.setGear(level);
+        const names = {0xFF: 'Reverse', 0: 'Neutral', 1: 'Gear 1', 2: 'Gear 2', 3: 'Gear 3'};
+        _toast(ok ? 'Sent: ${names[level] ?? level}' : 'Controller not connected');
+      },
       onReverseStart: () {
         if (!_vesc.startReverse()) {
           _toast('Reverse unavailable — not connected or wheel is moving');

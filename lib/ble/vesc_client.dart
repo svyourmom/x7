@@ -19,7 +19,6 @@ final Guid nusService = Guid('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
 final Guid nusRx = Guid('6e400002-b5a3-f393-e0a9-e50e24dcca9e'); // host -> controller
 final Guid nusTx = Guid('6e400003-b5a3-f393-e0a9-e50e24dcca9e'); // controller -> host
 
-final RegExp _modeRe = RegExp(r'\bmode=(\d)');
 
 class _R {
   final Uint8List b;
@@ -48,6 +47,7 @@ class VescClient {
   double? _motorA, _inputA, _duty, _inputV, _fetC, _motorC;
   List<String> _faults = const [];
   String? _mode; // 'street' | 'race'
+  String? _gear; // 'R','N','1','2','3' — from GET_VALUES_SELECTIVE bit 25
   int? _assist; // last-commanded assist level (no read-back exists on the X-9000)
 
   // --- hold-to-reverse (momentary; motion) ---
@@ -135,6 +135,12 @@ class VescClient {
     return true;
   }
 
+  /// Set gear/level (0x5E4EB0). level: Ebmx.gearReverse / gearNeutral / 1..3.
+  /// Requires the CAN-RX injector patch. Holds only with the display disconnected;
+  /// with a display attached the controller overwrites it within a few hundred ms.
+  /// The real gear is confirmed by the selective read in the poll loop, not assumed.
+  Future<bool> setGear(int level) => _send(Ebmx.setGear(level));
+
   // --- polling ---
   void _startPolling() {
     _pollTimer?.cancel();
@@ -146,7 +152,9 @@ class VescClient {
       }
       if (_reverse) _send(Motor.setDuty(reverseDuty)); // keep-alive (<1s VESC command timeout)
       requestValues();
-      if (_tick % 8 == 0) terminal('tcstrength'); // read the ride mode ~every 1.6 s (read-only)
+      // selective read gives BOTH ride mode (bit 24) and gear (bit 25) in one reply,
+      // ~every 1 s. Authoritative, unlike the previous tcstrength-string parse.
+      if (_tick % 5 == 0) _send(Ebmx.readGearMode());
       _tick++;
     });
   }
@@ -161,6 +169,7 @@ class VescClient {
       fetC: _fetC,
       motorC: _motorC,
       mode: _mode,
+      gear: _gear,
       assist: _assist,
       faults: _faults,
       updated: DateTime.now(),
@@ -174,14 +183,17 @@ class VescClient {
         case Comm.getValues:
           _parseValues(pl);
           break;
+        case Comm.getValuesSelective:
+          final gm = Ebmx.decodeGearMode(pl);
+          if (gm != null) {
+            _mode = gm.mode;
+            _gear = gm.gear;
+            _emit();
+          }
+          break;
         case Comm.comPrint:
           final line = String.fromCharCodes(pl.sublist(1)).trimRight();
           onPrint(line);
-          final m = _modeRe.firstMatch(line);
-          if (m != null) {
-            _mode = m.group(1) == '2' ? 'race' : 'street';
-            _emit();
-          }
           break;
       }
     }
