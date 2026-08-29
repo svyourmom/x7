@@ -187,11 +187,14 @@ class Dashboard extends StatelessWidget {
     return '${(c.inputV! * c.inputA!).toStringAsFixed(0)} W';
   }
 
-  // erpm -> speed needs pole pairs + wheel/gearing (calibration TODO). Placeholder in the
-  // chosen unit; shows 0 when parked.
+  // KNOWN ISSUE: the speed readout is UNCALIBRATED and reads incorrectly.
+  // erpm -> road speed needs the motor pole pairs, wheel diameter, and gearing ratio;
+  // the divisor below is a placeholder, not a real conversion. Everything else on the
+  // dashboard is verified against the bike. Calibration is the next task — until then
+  // treat MPH/KM-H as a non-representative stub (0 when parked is still correct).
   String _speed(int? erpm) {
     if (erpm == null) return '--';
-    final kmh = erpm.abs() / 1000.0; // uncalibrated stub
+    final kmh = erpm.abs() / 1000.0; // TODO(calibration): placeholder divisor — value is wrong
     return '${settings.speed(kmh)!.round()}';
   }
 }

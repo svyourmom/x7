@@ -53,9 +53,18 @@ with a connector (no re-flash), so nothing here is a one-way door.
 
 ## Status & roadmap
 
-Very early. Working toward: solid dual-BLE connect/reconnect, live telemetry, a clean
-Stark-Varg-inspired dashboard, and mode/assist controls. Good first issues will be tagged as the
-skeleton lands. Not affiliated with EBMX, VESC, Greenway, Talaria, or Stark.
+Working dashboard: dual-BLE (BMS + controller) telemetry, ride-mode control, and gear control
+(with the injector firmware; see [setup](docs/setup-hardware-software.md)). Verified on an
+X-9000 V3.
+
+**Known issues**
+- **Speed (MPH / KM-H) is uncalibrated and reads incorrectly.** The ERPM→road-speed conversion
+  needs the motor pole pairs, wheel diameter, and gearing ratio; the current value is a placeholder
+  divisor, not a real conversion (it still reads 0 when parked). This is the next task. Everything
+  else on the dashboard is confirmed against the bike.
+- Portrait layout works but is unofficial; landscape is the intended handlebar orientation.
+
+Not affiliated with EBMX, VESC, Greenway, Talaria, or Stark.
 
 ## License
 
