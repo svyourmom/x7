@@ -14,6 +14,10 @@ over Bluetooth. (Ride-mode control is an optional advanced feature; see below.)
 > implementations; the UI is a starting point meant to grow with contributions. See
 > [CONTRIBUTING.md](CONTRIBUTING.md).
 
+![x7 dashboard — live BMS + X-9000 telemetry, ride mode, and gear control](docs/images/dashboard-landscape.png)
+
+*Live dashboard: merged BMS + controller telemetry, Street/Race mode, and the gear selector (R/N/1/2/3). Shown connected to an X-9000 V3.*
+
 ## Companion references
 
 x7 is built on two open protocol references — read these to understand what the app is talking to:
