@@ -48,7 +48,7 @@ class Dashboard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _header(),
-        const SizedBox(height: 28),
+        const Spacer(),
         _heroRow(bms, ctrl),
         const SizedBox(height: 28),
         _tiles(bms, ctrl),
