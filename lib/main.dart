@@ -54,7 +54,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+class _HomePageState extends State<HomePage> {
   final Telemetry _t = Telemetry();
   late final VescClient _vesc;
   late final BmsClient _bms;
@@ -66,7 +66,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _freshTick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() {});
     });
@@ -86,13 +85,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) => _conn.start());
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) {
-      _vesc.stopReverse(); // safety: never keep the motor commanded while backgrounded
-    }
-  }
-
   void _onSettings() {
     _applyWakelock();
     setState(() {}); // units may have changed
@@ -106,7 +98,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _freshTick?.cancel();
     _s.removeListener(_onSettings);
     _conn.dispose();
@@ -134,16 +125,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final ok = await _vesc.setMode(race: race);
         _toast(ok ? 'Sent: ${race ? 'RACE' : 'STREET'} mode' : 'Controller not connected');
       },
-      onSetAssist: (level) async {
-        final ok = await _vesc.setAssist(level);
-        _toast(ok ? 'Sent: Assist $level' : 'Controller not connected');
+      onSetGear: (level) async {
+        final ok = await _vesc.setGear(level);
+        const names = {0xFF: 'Reverse', 0: 'Neutral', 1: 'Gear 1', 2: 'Gear 2', 3: 'Gear 3'};
+        _toast(ok ? 'Sent: ${names[level] ?? level}' : 'Controller not connected');
       },
-      onReverseStart: () {
-        if (!_vesc.startReverse()) {
-          _toast('Reverse unavailable — not connected or wheel is moving');
-        }
-      },
-      onReverseStop: () => _vesc.stopReverse(),
       onOpenSettings: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => SettingsScreen(settings: _s)),
       ),

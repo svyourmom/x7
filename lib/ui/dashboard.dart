@@ -12,9 +12,7 @@ class Dashboard extends StatelessWidget {
   final Telemetry telemetry;
   final Settings settings;
   final void Function(bool race) onSetMode;
-  final void Function(int level) onSetAssist;
-  final VoidCallback onReverseStart;
-  final VoidCallback onReverseStop;
+  final void Function(int level) onSetGear; // 0xFF=R, 0=N, 1..3 gears (0x5E4EB0)
   final VoidCallback onOpenSettings;
 
   const Dashboard({
@@ -22,9 +20,7 @@ class Dashboard extends StatelessWidget {
     required this.telemetry,
     required this.settings,
     required this.onSetMode,
-    required this.onSetAssist,
-    required this.onReverseStart,
-    required this.onReverseStop,
+    required this.onSetGear,
     required this.onOpenSettings,
   });
 
@@ -52,16 +48,14 @@ class Dashboard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _header(),
-        const SizedBox(height: 28),
+        const Spacer(),
         _heroRow(bms, ctrl),
         const SizedBox(height: 28),
         _tiles(bms, ctrl),
         const Spacer(),
         _modes(ctrl),
         const SizedBox(height: 16),
-        _assist(ctrl),
-        const SizedBox(height: 12),
-        _reverse(ctrl),
+        _gear(ctrl),
       ],
     );
   }
@@ -99,9 +93,7 @@ class Dashboard extends StatelessWidget {
                   children: [
                     _modes(ctrl),
                     const SizedBox(height: 16),
-                    _assist(ctrl),
-                    const SizedBox(height: 12),
-                    _reverse(ctrl),
+                    _gear(ctrl),
                   ],
                 ),
               ),
@@ -158,29 +150,27 @@ class Dashboard extends StatelessWidget {
     ]);
   }
 
-  Widget _reverse(CtrlState ctrl) {
-    return _ReverseButton(
-      enabled: ctrl.fresh,
-      onStart: onReverseStart,
-      onStop: onReverseStop,
-    );
-  }
-
-  Widget _assist(CtrlState ctrl) {
+  // Gear/level selector (0x5E4EB0). Shows the live gear read back on selective bit 25.
+  // Setting a gear needs the CAN-RX injector; it holds only with the display disconnected.
+  Widget _gear(CtrlState ctrl) {
     final live = ctrl.fresh;
+    // (label, level byte). R=reverse(0xFF), N=neutral(0), 1..3 gears.
+    const items = [('R', 0xFF), ('N', 0), ('1', 1), ('2', 2), ('3', 3)];
+    // map the read-back gear char to the label we highlight
+    final cur = ctrl.gear; // 'R','N','1','2','3' or null
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text('ASSIST', style: TextStyle(color: Colors.white54, letterSpacing: 2)),
+        const Text('GEAR', style: TextStyle(color: Colors.white54, letterSpacing: 2)),
         Row(children: [
-          for (final l in [1, 2, 3])
+          for (final it in items)
             Padding(
               padding: const EdgeInsets.only(left: 8),
-              child: _AssistButton(
-                level: l,
-                selected: ctrl.assist == l,
+              child: _GearButton(
+                label: it.$1,
+                selected: cur == it.$1,
                 enabled: live,
-                onTap: () => onSetAssist(l),
+                onTap: () => onSetGear(it.$2),
               ),
             ),
         ]),
@@ -197,11 +187,14 @@ class Dashboard extends StatelessWidget {
     return '${(c.inputV! * c.inputA!).toStringAsFixed(0)} W';
   }
 
-  // erpm -> speed needs pole pairs + wheel/gearing (calibration TODO). Placeholder in the
-  // chosen unit; shows 0 when parked.
+  // KNOWN ISSUE: the speed readout is UNCALIBRATED and reads incorrectly.
+  // erpm -> road speed needs the motor pole pairs, wheel diameter, and gearing ratio;
+  // the divisor below is a placeholder, not a real conversion. Everything else on the
+  // dashboard is verified against the bike. Calibration is the next task — until then
+  // treat MPH/KM-H as a non-representative stub (0 when parked is still correct).
   String _speed(int? erpm) {
     if (erpm == null) return '--';
-    final kmh = erpm.abs() / 1000.0; // uncalibrated stub
+    final kmh = erpm.abs() / 1000.0; // TODO(calibration): placeholder divisor — value is wrong
     return '${settings.speed(kmh)!.round()}';
   }
 }
@@ -280,87 +273,24 @@ class _ModeCard extends StatelessWidget {
   }
 }
 
-// Momentary hold-to-reverse. Spins only while the pointer is down; releases (coast) on up,
-// cancel, or dispose. Colour goes solid red while active.
-class _ReverseButton extends StatefulWidget {
-  final bool enabled;
-  final VoidCallback onStart;
-  final VoidCallback onStop;
-  const _ReverseButton({required this.enabled, required this.onStart, required this.onStop});
-  @override
-  State<_ReverseButton> createState() => _ReverseButtonState();
-}
-
-class _ReverseButtonState extends State<_ReverseButton> {
-  static const _red = Color(0xFFE0483B);
-  bool _held = false;
-
-  void _down() {
-    if (!widget.enabled || _held) return;
-    setState(() => _held = true);
-    widget.onStart();
-  }
-
-  void _up() {
-    if (!_held) return;
-    setState(() => _held = false);
-    widget.onStop();
-  }
-
-  @override
-  void dispose() {
-    if (_held) widget.onStop(); // never leave reverse engaged if the screen goes away mid-press
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: widget.enabled ? 1 : 0.35,
-      child: Listener(
-        onPointerDown: (_) => _down(),
-        onPointerUp: (_) => _up(),
-        onPointerCancel: (_) => _up(),
-        child: Container(
-          height: 52,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: _held ? _red : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _red, width: 1.5),
-          ),
-          child: Text(
-            _held ? 'REVERSING…' : 'HOLD TO REVERSE',
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 2,
-              color: _held ? Colors.white : _red,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AssistButton extends StatelessWidget {
-  final int level;
+class _GearButton extends StatelessWidget {
+  final String label;
   final bool selected;
   final bool enabled;
   final VoidCallback onTap;
-  const _AssistButton(
-      {required this.level, required this.selected, required this.onTap, this.enabled = true});
+  const _GearButton(
+      {required this.label, required this.selected, required this.onTap, this.enabled = true});
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
+    final isRev = label == 'R';
+    final accent = isRev ? const Color(0xFFE0574B) : Theme.of(context).colorScheme.primary;
     return Opacity(
       opacity: enabled ? 1 : 0.35,
       child: GestureDetector(
         onTap: enabled ? onTap : null,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          width: 52,
+          width: 46,
           height: 44,
           alignment: Alignment.center,
           decoration: BoxDecoration(
@@ -368,7 +298,7 @@ class _AssistButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: selected ? accent : Colors.white24, width: 1.5),
           ),
-          child: Text('$level',
+          child: Text(label,
               style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,

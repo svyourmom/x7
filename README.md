@@ -14,6 +14,10 @@ over Bluetooth. (Ride-mode control is an optional advanced feature; see below.)
 > implementations; the UI is a starting point meant to grow with contributions. See
 > [CONTRIBUTING.md](CONTRIBUTING.md).
 
+![x7 dashboard — live BMS + X-9000 telemetry, ride mode, and gear control](docs/images/dashboard-landscape.png)
+
+*Live dashboard: merged BMS + controller telemetry, Street/Race mode, and the gear selector (R/N/1/2/3). Shown connected to an X-9000 V3.*
+
 ## Companion references
 
 x7 is built on two open protocol references — read these to understand what the app is talking to:
@@ -23,17 +27,23 @@ x7 is built on two open protocol references — read these to understand what th
 - **[svyourmom/Talaria-Greenway-BMS-Protocol-Reference](https://github.com/svyourmom/Talaria-Greenway-BMS-Protocol-Reference)**
   — the battery/BMS side.
 
-## What it does (and doesn't need a firmware change)
+## What it does — in tiers
 
-**Baseline — zero firmware modification, fully reversible:**
-- Live merged telemetry from BMS + controller on one screen.
-- Read/adjust what's already exposed over the controller's VESC terminal (traction-control
-  strength, wheel-lift limiter, etc.).
+Control unlocks in tiers; the dashboard **reads** everything (telemetry, ride mode, gear) at every
+tier. Full setup detail: **[docs/setup-hardware-software.md](docs/setup-hardware-software.md)**.
 
-**Optional advanced — ride-mode / assist control:**
-- The controller only accepts mode/assist as CAN frames from the handlebar. A small, reversible
-  firmware patch (documented in **x7-vesc**) makes those commands reachable over Bluetooth; x7 will
-  drive them when present. This is opt-in and not required for the dashboard.
+- **Tier 1 — stock bike, no changes:** live merged BMS + controller telemetry, live mode + gear
+  read-out, and the terminal-exposed tuning (traction control, wheel-lift limiter). Control buttons
+  are inert (the controller takes mode/gear only as CAN frames from the display).
+- **Tier 2 — CAN-RX injector firmware** (small, reversible, documented in **x7-vesc**): ride
+  **mode** becomes fully controllable and sticks; gear can be sent but a connected display
+  overwrites it.
+- **Tier 3 — injector firmware + SW102T display disconnected:** x7 becomes the sole source of the
+  gear frames, so **gear control holds** and the phone replaces the display entirely
+  (**app-as-cockpit**). The display reconnects any time as a hardwired backup — see the setup doc.
+
+The injector firmware is inert unless x7 sends it a frame, and the display/no-display states switch
+with a connector (no re-flash), so nothing here is a one-way door.
 
 ## Tech
 
@@ -43,9 +53,18 @@ x7 is built on two open protocol references — read these to understand what th
 
 ## Status & roadmap
 
-Very early. Working toward: solid dual-BLE connect/reconnect, live telemetry, a clean
-Stark-Varg-inspired dashboard, and mode/assist controls. Good first issues will be tagged as the
-skeleton lands. Not affiliated with EBMX, VESC, Greenway, Talaria, or Stark.
+Working dashboard: dual-BLE (BMS + controller) telemetry, ride-mode control, and gear control
+(with the injector firmware; see [setup](docs/setup-hardware-software.md)). Verified on an
+X-9000 V3.
+
+**Known issues**
+- **Speed (MPH / KM-H) is uncalibrated and reads incorrectly.** The ERPM→road-speed conversion
+  needs the motor pole pairs, wheel diameter, and gearing ratio; the current value is a placeholder
+  divisor, not a real conversion (it still reads 0 when parked). This is the next task. Everything
+  else on the dashboard is confirmed against the bike.
+- Portrait layout works but is unofficial; landscape is the intended handlebar orientation.
+
+Not affiliated with EBMX, VESC, Greenway, Talaria, or Stark.
 
 ## License
 
