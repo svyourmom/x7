@@ -57,11 +57,11 @@ Working dashboard: dual-BLE (BMS + controller) telemetry, ride-mode control, and
 (with the injector firmware; see [setup](docs/setup-hardware-software.md)). Verified on an
 X-9000 V3.
 
-**Known issues**
-- **Speed (MPH / KM-H) is uncalibrated and reads incorrectly.** The ERPM→road-speed conversion
-  needs the motor pole pairs, wheel diameter, and gearing ratio; the current value is a placeholder
-  divisor, not a real conversion (it still reads 0 when parked). This is the next task. Everything
-  else on the dashboard is confirmed against the bike.
+**Status of features**
+- **Speed (MPH / KM-H): early success, not thoroughly tested.** Now reads the controller's own
+  firmware-computed road speed (from `GET_VALUES_SETUP`), not a stub — it looked correct in initial
+  on-bike testing. Still needs a proper GPS/known-speed check across the range before it's trusted.
+- Everything else on the dashboard (telemetry, mode, gear) is confirmed against the bike.
 - Portrait layout works but is unofficial; landscape is the intended handlebar orientation.
 
 Not affiliated with EBMX, VESC, Greenway, Talaria, or Stark.
