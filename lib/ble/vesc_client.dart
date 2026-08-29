@@ -47,15 +47,8 @@ class VescClient {
   double? _motorA, _inputA, _duty, _inputV, _fetC, _motorC;
   List<String> _faults = const [];
   String? _mode; // 'street' | 'race'
-  String? _gear; // 'R','N','1','2','3' — from GET_VALUES_SELECTIVE bit 25
-  int? _assist; // last-commanded assist level (no read-back exists on the X-9000)
+  String? _gear; // 'R','N','1','2','3' — from GET_VALUES_SELECTIVE bit 25 // last-commanded assist level (no read-back exists on the X-9000)
 
-  // --- hold-to-reverse (momentary; motion) ---
-  // SET_DUTY at a small negative duty = slow reverse creep (SET_RPM id 8 is repurposed on this fw).
-  static const double reverseDuty = -0.05; // ~5% duty; tune after the wheel-off test
-  static const int _engageMaxErpm = 1200; // refuse to engage reverse while rolling faster than this
-  bool _reverse = false;
-  bool get reverseActive => _reverse;
 
   final void Function(CtrlState) onState;
   final void Function(String line) onPrint;
@@ -65,7 +58,6 @@ class VescClient {
 
   Future<void> connect(BluetoothDevice device) async {
     _device = device;
-    _assist = null; // no read-back; don't carry a stale commanded level across connections
     await device.connect(autoConnect: false, timeout: const Duration(seconds: 20));
     final services = await device.discoverServices();
     for (final s in services) {
@@ -82,7 +74,6 @@ class VescClient {
   }
 
   Future<void> disconnect() async {
-    stopReverse(); // never leave the motor commanded
     _pollTimer?.cancel();
     await _notifySub?.cancel();
     await _device?.disconnect();
@@ -110,31 +101,6 @@ class VescClient {
   Future<void> terminal(String cmd) => _send([Comm.terminalCmd, ...cmd.codeUnits]);
   Future<bool> setMode({required bool race}) => _send(Ebmx.setMode(race: race));
 
-  /// Engage momentary reverse. Only while the button is held. Refuses if disconnected or
-  /// if the wheel is already rolling above [_engageMaxErpm]. The poll loop keeps it alive.
-  bool startReverse() {
-    if (!connected) return false;
-    if (_erpm != null && _erpm!.abs() > _engageMaxErpm) return false;
-    _reverse = true;
-    _send(Motor.setDuty(reverseDuty)); // immediate; poll loop resends as keep-alive
-    return true;
-  }
-
-  /// Release reverse — coast the motor. Safe to call redundantly. Also invoked on
-  /// disconnect/dispose so the motor never stays commanded.
-  void stopReverse() {
-    final was = _reverse;
-    _reverse = false;
-    if (was && connected) _send(Motor.release());
-  }
-  Future<bool> setAssist(int level) async {
-    final ok = await _send(Ebmx.setAssist(level));
-    if (!ok) return false;
-    _assist = level; // optimistic: the controller exposes no assist read-back
-    _emit();
-    return true;
-  }
-
   /// Set gear/level (0x5E4EB0). level: Ebmx.gearReverse / gearNeutral / 1..3.
   /// Requires the CAN-RX injector patch. Holds only with the display disconnected;
   /// with a display attached the controller overwrites it within a few hundred ms.
@@ -146,11 +112,7 @@ class VescClient {
     _pollTimer?.cancel();
     _tick = 0;
     _pollTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      if (!connected) {
-        _reverse = false; // link lost — drop reverse; controller's own timeout zeroes the motor
-        return;
-      }
-      if (_reverse) _send(Motor.setDuty(reverseDuty)); // keep-alive (<1s VESC command timeout)
+      if (!connected) return;
       requestValues();
       // selective read gives BOTH ride mode (bit 24) and gear (bit 25) in one reply,
       // ~every 1 s. Authoritative, unlike the previous tcstrength-string parse.
@@ -170,7 +132,6 @@ class VescClient {
       motorC: _motorC,
       mode: _mode,
       gear: _gear,
-      assist: _assist,
       faults: _faults,
       updated: DateTime.now(),
     ));

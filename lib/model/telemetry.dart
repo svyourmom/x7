@@ -33,8 +33,6 @@ class CtrlState {
   final double? motorC; // motor temp
   final String? mode; // "street" | "race"
   final String? gear; // 'R','N','1','2','3' — read from GET_VALUES_SELECTIVE bit 25
-  final int? assist; // last-commanded assist level (1..3); null = unknown/not set.
-                     // The X-9000 has no assist read-back, so this reflects what x7 sent.
   final List<String> faults;
   final DateTime? updated;
 
@@ -48,7 +46,6 @@ class CtrlState {
     this.motorC,
     this.mode,
     this.gear,
-    this.assist,
     this.faults = const [],
     this.updated,
   });
