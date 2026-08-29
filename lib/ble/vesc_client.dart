@@ -47,7 +47,8 @@ class VescClient {
   double? _motorA, _inputA, _duty, _inputV, _fetC, _motorC;
   List<String> _faults = const [];
   String? _mode; // 'street' | 'race'
-  String? _gear; // 'R','N','1','2','3' — from GET_VALUES_SELECTIVE bit 25 // last-commanded assist level (no read-back exists on the X-9000)
+  String? _gear; // 'R','N','1','2','3' — from GET_VALUES_SELECTIVE bit 25
+  double? _speedMs; // firmware-computed road speed (m/s), GET_VALUES_SETUP bit 6 // last-commanded assist level (no read-back exists on the X-9000)
 
 
   final void Function(CtrlState) onState;
@@ -116,7 +117,10 @@ class VescClient {
       requestValues();
       // selective read gives BOTH ride mode (bit 24) and gear (bit 25) in one reply,
       // ~every 1 s. Authoritative, unlike the previous tcstrength-string parse.
-      if (_tick % 5 == 0) _send(Ebmx.readGearMode());
+      if (_tick % 5 == 0) {
+        _send(Ebmx.readGearMode());
+        _send(Ebmx.readSpeed());
+      }
       _tick++;
     });
   }
@@ -132,6 +136,7 @@ class VescClient {
       motorC: _motorC,
       mode: _mode,
       gear: _gear,
+      speedMs: _speedMs,
       faults: _faults,
       updated: DateTime.now(),
     ));
@@ -149,6 +154,13 @@ class VescClient {
           if (gm != null) {
             _mode = gm.mode;
             _gear = gm.gear;
+            _emit();
+          }
+          break;
+        case Comm.getValuesSetupSelective:
+          final ms = Ebmx.decodeSpeedMs(pl);
+          if (ms != null) {
+            _speedMs = ms;
             _emit();
           }
           break;

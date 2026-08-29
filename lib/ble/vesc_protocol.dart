@@ -168,6 +168,25 @@ class Ebmx {
   //   [50][mask:u32 BE][mode:u8][level:s8]
   static const int selMask = (1 << 24) | (1 << 25); // 0x03000000
 
+  // GET_VALUES_SETUP_SELECTIVE (id 51), mask (1<<6) = speed (bit 6, ahead of the EBMX
+  // divergence at bit 7). Reply: [51][mask:u32 BE][speed:i32 BE] where speed/1000 = m/s.
+  static const int setupSpeedMask = 1 << 6; // 0x40
+  static Uint8List readSpeed() => Uint8List.fromList([
+        Comm.getValuesSetupSelective,
+        (setupSpeedMask >> 24) & 0xFF,
+        (setupSpeedMask >> 16) & 0xFF,
+        (setupSpeedMask >> 8) & 0xFF,
+        setupSpeedMask & 0xFF,
+      ]);
+
+  /// Decode m/s from a setup-selective speed reply payload (excludes id). null if short.
+  static double? decodeSpeedMs(List<int> pl) {
+    if (pl.length < 9) return null; // [51][4 mask][i32 speed]
+    int v = (pl[5] << 24) | (pl[6] << 16) | (pl[7] << 8) | pl[8];
+    if (v & 0x80000000 != 0) v -= 0x100000000; // signed
+    return v / 1000.0;
+  }
+
   static Uint8List readGearMode() => Uint8List.fromList([
         Comm.getValuesSelective,
         (selMask >> 24) & 0xFF,

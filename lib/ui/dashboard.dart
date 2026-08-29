@@ -127,7 +127,7 @@ class Dashboard extends StatelessWidget {
     return Row(
       children: [
         Expanded(child: _Hero(label: 'SOC', value: _pct(bms.soc))),
-        Expanded(child: _Hero(label: settings.speedUnit, value: _speed(ctrl.erpm))),
+        Expanded(child: _Hero(label: settings.speedUnit, value: _speed(ctrl.speedMs))),
       ],
     );
   }
@@ -187,14 +187,13 @@ class Dashboard extends StatelessWidget {
     return '${(c.inputV! * c.inputA!).toStringAsFixed(0)} W';
   }
 
-  // KNOWN ISSUE: the speed readout is UNCALIBRATED and reads incorrectly.
-  // erpm -> road speed needs the motor pole pairs, wheel diameter, and gearing ratio;
-  // the divisor below is a placeholder, not a real conversion. Everything else on the
-  // dashboard is verified against the bike. Calibration is the next task — until then
-  // treat MPH/KM-H as a non-representative stub (0 when parked is still correct).
-  String _speed(int? erpm) {
-    if (erpm == null) return '--';
-    final kmh = erpm.abs() / 1000.0; // TODO(calibration): placeholder divisor — value is wrong
+  // Firmware-computed road speed: GET_VALUES_SETUP bit 6 gives m/s (the same value the
+  // controller shows on the display), derived from the mcconf pole pairs / wheel / gearing.
+  // Early on-bike testing looked correct; not yet verified against GPS across the range.
+  // If it ever reads wrong, fall back to computing from the mcconf si_ constants.
+  String _speed(double? speedMs) {
+    if (speedMs == null) return '--';
+    final kmh = speedMs.abs() * 3.6;
     return '${settings.speed(kmh)!.round()}';
   }
 }

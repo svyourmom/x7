@@ -33,6 +33,7 @@ class CtrlState {
   final double? motorC; // motor temp
   final String? mode; // "street" | "race"
   final String? gear; // 'R','N','1','2','3' — read from GET_VALUES_SELECTIVE bit 25
+  final double? speedMs; // road speed in m/s, firmware-computed (GET_VALUES_SETUP bit 6)
   final List<String> faults;
   final DateTime? updated;
 
@@ -46,6 +47,7 @@ class CtrlState {
     this.motorC,
     this.mode,
     this.gear,
+    this.speedMs,
     this.faults = const [],
     this.updated,
   });
