@@ -1,5 +1,7 @@
 # x7 — open dashboard & control center for Talaria (Greenway BMS + EBMX X-9000)
 
+[![build](https://github.com/svyourmom/x7/actions/workflows/build.yml/badge.svg)](https://github.com/svyourmom/x7/actions/workflows/build.yml)
+
 **x7** is an open-source **Flutter** app that turns a phone into a live dashboard and control
 center for a Talaria-class ebike, by talking **over Bluetooth** to two devices at once:
 
@@ -17,6 +19,25 @@ over Bluetooth. (Ride-mode control is an optional advanced feature; see below.)
 ![x7 dashboard — live BMS + X-9000 telemetry, ride mode, and gear control](docs/images/dashboard-landscape.png)
 
 *Live dashboard: merged BMS + controller telemetry, Street/Race mode, and the gear selector (R/N/1/2/3). Shown connected to an X-9000 V3.*
+
+## Download
+
+Prebuilt APKs are on the **[Releases page](https://github.com/svyourmom/x7/releases)** — one
+universal APK per release (`arm64-v8a` + `armeabi-v7a` + `x86_64`), so a single file installs on
+essentially any Android phone. Builds are produced by GitHub Actions straight from the tagged
+source; per-commit builds are also kept as artifacts on the
+[Actions runs](https://github.com/svyourmom/x7/actions/workflows/build.yml) (GitHub sign-in
+required to download those).
+
+- Android will ask you to allow installing from unknown sources, and may warn that the developer
+  is unrecognised — these builds are signed with the CI runner's throwaway debug key, not a
+  registered developer certificate.
+- **Upgrading requires uninstalling first.** That key differs from build to build, and Android only
+  allows an in-place update when the signature matches. Remove the old x7 (Settings → Apps → x7 →
+  Uninstall, or `adb uninstall com.svyourmom.x7`) before installing a newer one. This resets the
+  app's saved settings.
+
+Read [Safety](#safety) before connecting to a bike.
 
 ## Companion references
 
