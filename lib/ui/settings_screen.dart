@@ -108,35 +108,34 @@ class _DevicePickerState extends State<DevicePicker> {
     final sel = s.deviceFor(role);
     return Scaffold(
       appBar: AppBar(title: Text(widget.profile.label)),
-      body: ListView(
-        children: [
-          RadioListTile<String?>(
-            title: const Text('Auto (first found)'),
-            value: null,
-            groupValue: sel,
-            onChanged: (_) {
-              s.setDeviceFor(role, null);
-              Navigator.of(context).pop();
-            },
-          ),
-          for (final r in _found.values)
-            RadioListTile<String?>(
-              title: Text(r.advertisementData.advName.isNotEmpty
-                  ? r.advertisementData.advName
-                  : '(unnamed)'),
-              subtitle: Text('${r.device.remoteId.str}  ·  ${r.rssi} dBm'),
-              value: r.device.remoteId.str,
-              groupValue: sel,
-              onChanged: (v) {
-                s.setDeviceFor(role, v);
-                Navigator.of(context).pop();
-              },
+      // RadioGroup owns the selection + change callback; the tiles just declare their
+      // value. The 'Auto' tile's value is null, so it lands in the same handler.
+      body: RadioGroup<String?>(
+        groupValue: sel,
+        onChanged: (v) {
+          s.setDeviceFor(role, v);
+          Navigator.of(context).pop();
+        },
+        child: ListView(
+          children: [
+            const RadioListTile<String?>(
+              title: Text('Auto (first found)'),
+              value: null,
             ),
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: Text('Scanning…', style: TextStyle(color: Colors.white38))),
-          ),
-        ],
+            for (final r in _found.values)
+              RadioListTile<String?>(
+                title: Text(r.advertisementData.advName.isNotEmpty
+                    ? r.advertisementData.advName
+                    : '(unnamed)'),
+                subtitle: Text('${r.device.remoteId.str}  ·  ${r.rssi} dBm'),
+                value: r.device.remoteId.str,
+              ),
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: Text('Scanning…', style: TextStyle(color: Colors.white38))),
+            ),
+          ],
+        ),
       ),
     );
   }

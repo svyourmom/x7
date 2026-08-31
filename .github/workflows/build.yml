@@ -49,7 +49,9 @@ jobs:
 
       # test/widget_test.dart is pure Dart (CRC-16, VESC framing, cmd-113 injector
       # packets, SET_DUTY encoding, BMS read framing) -- no BLE or hardware needed.
+      # Runs even when analyze fails: a lint finding should not hide a test result.
       - run: flutter test
+        if: '!cancelled()'
 
   build:
     name: universal release APK
