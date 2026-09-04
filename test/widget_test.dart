@@ -40,6 +40,36 @@ void main() {
     expect(Motor.release(), [Comm.setCurrent, 0, 0, 0, 0]);
   });
 
+  test('terminal command payload: id 20 + ASCII, no trailing NUL', () {
+    final p = terminalCmd('vwheelie_diag');
+    expect(p.first, Comm.terminalCmd);
+    expect(String.fromCharCodes(p.sublist(1)), 'vwheelie_diag');
+    expect(p.length, 1 + 13);
+    expect(Wheelie.on, 'vwheelie_diag on');
+    expect(Wheelie.off, 'vwheelie_diag off');
+    expect(Wheelie.start('12'), 'vwheelie_diag start 12');
+  });
+
+  test('vwheelie_diag reply lines parse (formats from the firmware strings)', () {
+    // status header
+    var w = Wheelie.parseLine('vwheelie_diag #1  running=1  enabled=0  active=0')!;
+    expect(w.running, true);
+    expect(w.enabled, false);
+    expect(w.start, null);
+    // params: keep the printed text so a restore sends exactly what was there
+    w = Wheelie.parseLine('  params: start=20.00 end=43.00 kd=0.005')!;
+    expect(w.start, '20.00');
+    expect(w.enabled, null);
+    // on/off confirmations
+    expect(Wheelie.parseLine('vwheelie: ENABLED')!.enabled, true);
+    expect(Wheelie.parseLine('vwheelie: DISABLED')!.enabled, false);
+    // start angle echo
+    expect(Wheelie.parseLine('vwheelie start -> 12.00 deg')!.start, '12.00');
+    // unrelated terminal output
+    expect(Wheelie.parseLine('  live:   pitch=1.23 deg  rate=0.00 deg/s'), null);
+    expect(Wheelie.parseLine('tcstrength: mode=2  active=0%'), null);
+  });
+
   test('BMS read request framing (BatteryVoltage, param 9)', () {
     // 46 16 01 09 04 6A  (from the Greenway reference)
     expect(bmsRead(9, 4), [0x46, 0x16, 0x01, 0x09, 0x04, 0x6A]);

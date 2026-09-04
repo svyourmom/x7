@@ -11,7 +11,8 @@ x7's protocol code is a faithful port of the working Python tools in
 | frame / unframe | `frame()` / `Unframer` | `frame()` / `Unframer` |
 | command ids | `COMM {...}` | `class Comm` |
 | GET_VALUES parse | `values` / dump decoders | `VescClient._parseValues()` |
-| terminal command | `term "<cmd>"` | `VescClient.terminal()` |
+| terminal command | `term "<cmd>"` | `terminalCmd()` / `VescClient.terminal()` |
+| wheel-lift limiter (`vwheelie_diag`) | x7-vesc `docs/04-terminal-commands.md` | `class Wheelie` (commands + reply parser) |
 | CAN-RX injection (patch) | `raw "71 ...."` | `canRxInject()` / `Ebmx.*` |
 | EBMX CAN ids | x7-vesc `docs/02-ebmx-can-protocol.md` | `class Ebmx` |
 

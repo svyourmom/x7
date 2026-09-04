@@ -9,9 +9,13 @@ Dark, premium, minimal, glanceable at speed and in sunlight.
   spread, etc.
 - **Ride-mode cards:** Street / Race, tap to select (drives the mode command when the firmware
   patch is present).
-- **Assist strip:** quick level select.
+- **Wheel-lift row:** WHEELIE (on/off toggle, green when on) and LAUNCH (amber = temporary:
+  armed outline, filled countdown while the window runs). See
+  [wheel-lift-control.md](wheel-lift-control.md).
+- **Gear strip:** R / N / 1 / 2 / 3.
 - **Connection dots:** BMS + controller liveness at a glance.
-- Thumb-reachable on a handlebar mount; high-contrast; no clutter.
+- Thumb-reachable on a handlebar mount; high-contrast; no clutter. Green means "on and staying
+  on", amber means "temporary", red is reverse.
 
 Future: round/gauge widgets, cell-voltage bar, temperature/graph history, a kiosk/full-screen
-"ride mode," and a settings screen (traction control / wheel-lift via terminal commands).
+"ride mode," and traction-control strength in Settings (terminal command, like the limiter).

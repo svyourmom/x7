@@ -20,6 +20,7 @@ You need a real phone with Bluetooth — an emulator has no BLE radio, so it can
 - `lib/ble/vesc_client.dart` — EBMX X-9000 BLE connection, polling, parsing, control.
 - `lib/ble/bms_client.dart` — Greenway BMS client **(stub — port the parser from the BMS reference)**.
 - `lib/model/telemetry.dart` — the merged telemetry model the UI renders.
+- `lib/launch_assist.dart` — the timed wheel-lift limiter (LAUNCH) state machine, tested with a fake link.
 - `lib/ui/dashboard.dart` — the dashboard shell.
 
 ## Good first issues (help wanted)

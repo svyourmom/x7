@@ -6,6 +6,9 @@ GPLv3 — see the top-level `LICENSE`).
 - [architecture.md](architecture.md) — data flow, the two BLE clients, the merged model.
 - [protocol-port.md](protocol-port.md) — mapping the reference Python to the Dart implementation.
 - [ui-spec.md](ui-spec.md) — the Stark-Varg-inspired dashboard direction.
+- [wheel-lift-control.md](wheel-lift-control.md) — the WHEELIE toggle and the timed LAUNCH button
+  for the controller's wheel-lift limiter, every operating configuration, and what happens when
+  things go wrong.
 
 Protocol details live in the companion references:
 [x7-vesc](https://github.com/svyourmom/x7-vesc) (controller) and

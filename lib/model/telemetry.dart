@@ -34,6 +34,10 @@ class CtrlState {
   final String? mode; // "street" | "race"
   final String? gear; // 'R','N','1','2','3' — read from GET_VALUES_SELECTIVE bit 25
   final double? speedMs; // road speed in m/s, firmware-computed (GET_VALUES_SETUP bit 6)
+  // Wheel-lift limiter, read back from `vwheelie_diag`. null = not read yet.
+  final bool? limiterOn;
+  final bool? limiterRunning; // limiter thread alive on the controller
+  final String? limiterStart; // start angle as printed, e.g. "20.00"
   final List<String> faults;
   final DateTime? updated;
 
@@ -48,6 +52,9 @@ class CtrlState {
     this.mode,
     this.gear,
     this.speedMs,
+    this.limiterOn,
+    this.limiterRunning,
+    this.limiterStart,
     this.faults = const [],
     this.updated,
   });

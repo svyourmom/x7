@@ -5,7 +5,8 @@
 // svyourmom/x7-vesc tools/vesc-ble.py.
 //
 // Holds the latest controller state and re-emits a merged CtrlState whenever any source
-// updates (GET_VALUES for power/temps; the `tcstrength` terminal read for the ride mode).
+// updates (GET_VALUES for power/temps, selective reads for mode/gear/speed, and the
+// `vwheelie_diag` terminal read for the wheel-lift limiter).
 
 import 'dart:async';
 import 'dart:typed_data';
@@ -19,6 +20,13 @@ final Guid nusService = Guid('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
 final Guid nusRx = Guid('6e400002-b5a3-f393-e0a9-e50e24dcca9e'); // host -> controller
 final Guid nusTx = Guid('6e400003-b5a3-f393-e0a9-e50e24dcca9e'); // controller -> host
 
+/// The few things launch assist needs from the controller link. VescClient implements
+/// it; tests use a fake.
+abstract class LimiterPort {
+  bool get connected;
+  Future<bool> setLimiter(bool on);
+  Future<bool> setLimiterStart(String deg);
+}
 
 class _R {
   final Uint8List b;
@@ -34,27 +42,31 @@ class _R {
   void u8() => i++;
 }
 
-class VescClient {
+class VescClient implements LimiterPort {
   BluetoothDevice? _device;
   BluetoothCharacteristic? _rx, _tx;
   final Unframer _un = Unframer();
   StreamSubscription? _notifySub;
   Timer? _pollTimer;
   int _tick = 0;
+  // Frames are written one after another so the 20-byte chunks of two frames never mix.
+  Future<void> _writes = Future.value();
 
-  // latest controller state (merged from GET_VALUES + the tcstrength mode read)
+  // latest controller state
   int? _erpm;
   double? _motorA, _inputA, _duty, _inputV, _fetC, _motorC;
   List<String> _faults = const [];
   String? _mode; // 'street' | 'race'
   String? _gear; // 'R','N','1','2','3' — from GET_VALUES_SELECTIVE bit 25
-  double? _speedMs; // firmware-computed road speed (m/s), GET_VALUES_SETUP bit 6 // last-commanded assist level (no read-back exists on the X-9000)
-
+  double? _speedMs; // firmware-computed road speed (m/s), GET_VALUES_SETUP bit 6
+  bool? _limiterOn, _limiterRunning; // wheel-lift limiter, from `vwheelie_diag`
+  String? _limiterStart;
 
   final void Function(CtrlState) onState;
   final void Function(String line) onPrint;
   VescClient({required this.onState, required this.onPrint});
 
+  @override
   bool get connected => _device?.isConnected ?? false;
 
   Future<void> connect(BluetoothDevice device) async {
@@ -71,6 +83,10 @@ class VescClient {
     if (_rx == null || _tx == null) throw StateError('X-9000 NUS characteristics not found');
     await _tx!.setNotifyValue(true);
     _notifySub = _tx!.onValueReceived.listen(_onNotify);
+    // limiter state is unknown until the first status reply from this connection
+    _limiterOn = null;
+    _limiterRunning = null;
+    _limiterStart = null;
     _startPolling();
   }
 
@@ -82,9 +98,15 @@ class VescClient {
 
   /// Sends a framed payload. Returns false (rather than throwing) if the controller
   /// isn't connected or the write fails, so control taps never fail silently.
-  Future<bool> _send(List<int> payload) async {
+  Future<bool> _send(List<int> payload) {
     final rx = _rx;
-    if (!connected || rx == null) return false;
+    if (!connected || rx == null) return Future.value(false);
+    final done = _writes.then((_) => _write(rx, payload));
+    _writes = done.then((_) {}, onError: (_) {});
+    return done;
+  }
+
+  Future<bool> _write(BluetoothCharacteristic rx, List<int> payload) async {
     try {
       final pkt = frame(payload);
       for (int off = 0; off < pkt.length; off += 20) {
@@ -98,8 +120,8 @@ class VescClient {
   }
 
   // --- commands ---
-  Future<void> requestValues() => _send([Comm.getValues]);
-  Future<void> terminal(String cmd) => _send([Comm.terminalCmd, ...cmd.codeUnits]);
+  Future<bool> requestValues() => _send([Comm.getValues]);
+  Future<bool> terminal(String cmd) => _send(terminalCmd(cmd));
   Future<bool> setMode({required bool race}) => _send(Ebmx.setMode(race: race));
 
   /// Set gear/level (0x5E4EB0). level: Ebmx.gearReverse / gearNeutral / 1..3.
@@ -107,6 +129,15 @@ class VescClient {
   /// with a display attached the controller overwrites it within a few hundred ms.
   /// The real gear is confirmed by the selective read in the poll loop, not assumed.
   Future<bool> setGear(int level) => _send(Ebmx.setGear(level));
+
+  /// Wheel-lift limiter on/off. Stock firmware, no patch needed. Confirmed by the
+  /// controller's printed reply, which the poll loop parses into CtrlState.limiterOn.
+  @override
+  Future<bool> setLimiter(bool on) => terminal(on ? Wheelie.on : Wheelie.off);
+
+  /// Wheel-lift limiter start angle in degrees (text, e.g. "12" or "20.00").
+  @override
+  Future<bool> setLimiterStart(String deg) => terminal(Wheelie.start(deg));
 
   // --- polling ---
   void _startPolling() {
@@ -116,11 +147,13 @@ class VescClient {
       if (!connected) return;
       requestValues();
       // selective read gives BOTH ride mode (bit 24) and gear (bit 25) in one reply,
-      // ~every 1 s. Authoritative, unlike the previous tcstrength-string parse.
+      // ~every 1 s. Authoritative, unlike a terminal-string parse.
       if (_tick % 5 == 0) {
         _send(Ebmx.readGearMode());
         _send(Ebmx.readSpeed());
       }
+      // limiter state ~every 1 s, on the ticks between the reads above
+      if (_tick % 5 == 2) terminal(Wheelie.read);
       _tick++;
     });
   }
@@ -137,6 +170,9 @@ class VescClient {
       mode: _mode,
       gear: _gear,
       speedMs: _speedMs,
+      limiterOn: _limiterOn,
+      limiterRunning: _limiterRunning,
+      limiterStart: _limiterStart,
       faults: _faults,
       updated: DateTime.now(),
     ));
@@ -167,9 +203,20 @@ class VescClient {
         case Comm.comPrint:
           final line = String.fromCharCodes(pl.sublist(1)).trimRight();
           onPrint(line);
+          _parsePrint(line);
           break;
       }
     }
+  }
+
+  // Terminal output: pick out what the wheel-lift limiter says, ignore the rest.
+  void _parsePrint(String line) {
+    final w = Wheelie.parseLine(line);
+    if (w == null) return;
+    if (w.running != null) _limiterRunning = w.running;
+    if (w.enabled != null) _limiterOn = w.enabled;
+    if (w.start != null) _limiterStart = w.start;
+    _emit();
   }
 
   void _parseValues(Uint8List pl) {

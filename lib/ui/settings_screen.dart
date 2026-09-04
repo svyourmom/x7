@@ -1,4 +1,4 @@
-// Settings: units, keep-screen-on, and per-role device selection.
+// Settings: units, keep-screen-on, launch assist, and per-role device selection.
 // The Devices list iterates the device_profiles registry, so future device types show up here
 // with no UI changes.
 
@@ -37,10 +37,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (v) => setState(() => s.setKeepScreenOn(v)),
           ),
           const Divider(),
+          const _SectionHeader('LAUNCH ASSIST'),
           const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text('DEVICES', style: TextStyle(color: Colors.white54, letterSpacing: 2, fontSize: 12)),
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: Text(
+              'LAUNCH turns on the controller\'s wheel-lift limiter from the moment the wheel '
+              'starts turning, for this many seconds, then puts it back.',
+              style: TextStyle(color: Colors.white54, fontSize: 13),
+            ),
           ),
+          _SliderTile(
+            title: 'Launch window',
+            valueLabel: '${s.launchWindowS} s',
+            value: s.launchWindowS,
+            min: Settings.launchWindowMin,
+            max: Settings.launchWindowMax,
+            onChanged: (v) => setState(() => s.setLaunchWindowS(v)),
+          ),
+          SwitchListTile(
+            title: const Text('Lower start angle during launch'),
+            subtitle: const Text('Off = use the controller\'s current angle'),
+            value: s.launchStartOverride,
+            onChanged: (v) => setState(() => s.setLaunchStartOverride(v)),
+          ),
+          if (s.launchStartOverride)
+            _SliderTile(
+              title: 'Start angle',
+              valueLabel: '${s.launchStartDeg}°',
+              value: s.launchStartDeg,
+              min: Settings.launchStartMin,
+              max: Settings.launchStartMax,
+              onChanged: (v) => setState(() => s.setLaunchStartDeg(v)),
+            ),
+          const Divider(),
+          const _SectionHeader('DEVICES'),
           for (final p in deviceProfiles)
             ListTile(
               title: Text(p.label),
@@ -57,6 +87,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String text;
+  const _SectionHeader(this.text);
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+        child: Text(text,
+            style: const TextStyle(color: Colors.white54, letterSpacing: 2, fontSize: 12)),
+      );
+}
+
+/// A labelled whole-number slider: title and current value on one line, slider below.
+class _SliderTile extends StatelessWidget {
+  final String title, valueLabel;
+  final int value, min, max;
+  final void Function(int) onChanged;
+  const _SliderTile({
+    required this.title,
+    required this.valueLabel,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+  });
+  @override
+  Widget build(BuildContext context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            title: Text(title),
+            trailing: Text(valueLabel,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          ),
+          Slider(
+            value: value.toDouble(),
+            min: min.toDouble(),
+            max: max.toDouble(),
+            divisions: max - min,
+            onChanged: (v) => onChanged(v.round()),
+          ),
+        ],
+      );
 }
 
 class DevicePicker extends StatefulWidget {

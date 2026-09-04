@@ -15,10 +15,11 @@ Works immediately, fully reversible, nothing to flash:
 - Live merged telemetry (BMS + controller) on one screen.
 - Read ride **mode** and **gear** — x7 reads both over Bluetooth
   (`GET_VALUES_SELECTIVE`), so the dashboard always shows the real gear/mode even with no mods.
-- Adjust what the controller already exposes over its VESC terminal (traction-control strength,
-  wheel-lift limiter, etc.).
+- **Wheel-lift limiter control** — the WHEELIE on/off toggle and the timed LAUNCH button drive
+  the controller's built-in limiter over its VESC terminal. Real control on a stock bike; see
+  [wheel-lift-control.md](wheel-lift-control.md).
 
-At this tier the **control** buttons (mode, gear) are inert — the controller only accepts those as
+At this tier the **mode and gear** buttons are inert — the controller only accepts those as
 CAN frames from the display, not over Bluetooth.
 
 ## Tier 2 — CAN-RX injector firmware (software change)

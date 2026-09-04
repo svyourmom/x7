@@ -116,6 +116,52 @@ class Unframer {
   }
 }
 
+/// Build a terminal command payload: [20] + the command text (no trailing NUL).
+/// Replies come back as COMM_PRINT (21) packets, one per printed line.
+Uint8List terminalCmd(String cmd) => Uint8List.fromList([Comm.terminalCmd, ...cmd.codeUnits]);
+
+/// One parsed line of `vwheelie_diag` output. Only the fields x7 uses.
+class WheelieLine {
+  final bool? running; // limiter thread alive (IMU present)
+  final bool? enabled; // limiter switched on
+  final String? start; // start angle exactly as the controller printed it, e.g. "20.00"
+  const WheelieLine({this.running, this.enabled, this.start});
+}
+
+/// The controller's built-in wheel-lift limiter, driven over the terminal.
+/// Command syntax and reply format: x7-vesc docs/04-terminal-commands.md.
+class Wheelie {
+  static const String read = 'vwheelie_diag';
+  static const String on = 'vwheelie_diag on';
+  static const String off = 'vwheelie_diag off';
+
+  /// Set the pitch angle (degrees) where the limiter starts acting.
+  static String start(String deg) => 'vwheelie_diag start $deg';
+
+  // Reply formats, verbatim from the firmware strings:
+  //   vwheelie_diag #1  running=1  enabled=0  active=0
+  //     params: start=20.00 end=43.00 kd=0.005
+  //   vwheelie: ENABLED   /   vwheelie: DISABLED
+  //   vwheelie start -> 12.00 deg
+  static final RegExp _header = RegExp(r'running=(\d)\s+enabled=(\d)');
+  static final RegExp _params = RegExp(r'start=(\d+\.\d+)\s+end=');
+  static final RegExp _switched = RegExp(r'vwheelie:\s+(ENABLED|DISABLED)');
+  static final RegExp _startSet = RegExp(r'vwheelie start\s+->\s+(\d+\.\d+)');
+
+  /// Parse one printed line. Returns null for lines that say nothing about the limiter.
+  static WheelieLine? parseLine(String line) {
+    var m = _header.firstMatch(line);
+    if (m != null) return WheelieLine(running: m[1] == '1', enabled: m[2] == '1');
+    m = _params.firstMatch(line);
+    if (m != null) return WheelieLine(start: m[1]);
+    m = _switched.firstMatch(line);
+    if (m != null) return WheelieLine(enabled: m[1] == 'ENABLED');
+    m = _startSet.firstMatch(line);
+    if (m != null) return WheelieLine(start: m[1]);
+    return null;
+  }
+}
+
 /// Build the CAN-RX injection payload for the optional firmware patch (cmd 113).
 /// Sends a synthetic CAN frame: [113][extId:u32 BE][8 data bytes].
 Uint8List canRxInject(int extId, List<int> data8) {

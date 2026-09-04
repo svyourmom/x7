@@ -1,18 +1,26 @@
 // x7 dashboard — Stark-Varg-inspired shell.
 //
 // Dark, minimal, big central readouts, ride-mode cards, a row of stat tiles, and a control
-// strip. Units follow Settings (metric/imperial). Layout is anchored top + bottom with a
-// flexible gap so it reads well in portrait.
+// strip (wheel-lift limiter + launch assist, then gear). Units follow Settings
+// (metric/imperial). Layout is anchored top + bottom with a flexible gap so it reads well
+// in portrait.
 
 import 'package:flutter/material.dart';
+import '../launch_assist.dart';
 import '../model/telemetry.dart';
 import '../settings.dart';
+
+// amber = "temporary": the launch assist states
+const Color _amber = Color(0xFFF5B942);
 
 class Dashboard extends StatelessWidget {
   final Telemetry telemetry;
   final Settings settings;
   final void Function(bool race) onSetMode;
   final void Function(int level) onSetGear; // 0xFF=R, 0=N, 1..3 gears (0x5E4EB0)
+  final LaunchAssist launch;
+  final VoidCallback onLaunchTap;
+  final VoidCallback onToggleLimiter;
   final VoidCallback onOpenSettings;
 
   const Dashboard({
@@ -21,6 +29,9 @@ class Dashboard extends StatelessWidget {
     required this.settings,
     required this.onSetMode,
     required this.onSetGear,
+    required this.launch,
+    required this.onLaunchTap,
+    required this.onToggleLimiter,
     required this.onOpenSettings,
   });
 
@@ -54,7 +65,9 @@ class Dashboard extends StatelessWidget {
         _tiles(bms, ctrl),
         const Spacer(),
         _modes(ctrl),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
+        _assist(ctrl, compact: false),
+        const SizedBox(height: 12),
         _gear(ctrl),
       ],
     );
@@ -92,7 +105,9 @@ class Dashboard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     _modes(ctrl),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
+                    _assist(ctrl, compact: true),
+                    const SizedBox(height: 10),
                     _gear(ctrl),
                   ],
                 ),
@@ -147,6 +162,76 @@ class Dashboard extends StatelessWidget {
       _ModeCard('STREET', selected: ctrl.mode == 'street', enabled: live, onTap: () => onSetMode(false)),
       const SizedBox(width: 12),
       _ModeCard('RACE', selected: ctrl.mode == 'race', enabled: live, onTap: () => onSetMode(true)),
+    ]);
+  }
+
+  // Wheel-lift limiter controls. WHEELIE = plain on/off, shown from the state read back
+  // over the terminal. LAUNCH = on for one launch, then restored (see launch_assist.dart).
+  // Stock firmware, no patch needed.
+  Widget _assist(CtrlState ctrl, {required bool compact}) {
+    final live = ctrl.fresh;
+    final phase = launch.phase;
+    final busy = phase != LaunchPhase.idle;
+    final on = ctrl.limiterOn;
+
+    // WHEELIE: needs a live link and a known state; hands off while a launch runs
+    final wheelieEnabled = live && on != null && !busy;
+
+    // LAUNCH: never lock the rider out of cancelling
+    final launchEnabled = (live && !launch.redundant) || busy;
+    String title, sub;
+    Color? fill, border, fg;
+    double? progress;
+    switch (phase) {
+      case LaunchPhase.idle:
+        title = 'LAUNCH';
+        sub = launch.redundant
+            ? 'ALREADY ON'
+            : (compact ? 'TAP TO ARM' : 'TAP TO ARM · ${settings.launchWindowS} s');
+      case LaunchPhase.arming:
+        title = 'ARMING…';
+        sub = compact ? 'WAITING' : 'WAITING FOR CONTROLLER';
+      case LaunchPhase.armed:
+        title = 'ARMED';
+        sub = compact ? 'ROLL TO START' : 'ROLL TO START · ${launch.windowS} s';
+        border = _amber;
+        fg = _amber;
+        fill = _amber.withValues(alpha: 0.16);
+      case LaunchPhase.active:
+        final left = launch.secondsLeft ?? 0;
+        title = '$left s';
+        sub = 'LIMITER ON';
+        border = _amber;
+        fill = _amber;
+        fg = const Color(0xFF0B0D10);
+        progress = launch.windowS == 0 ? 0 : left / launch.windowS;
+      case LaunchPhase.restoring:
+        title = 'RESTORING…';
+        sub = compact ? 'RESTORING' : 'PUTTING LIMITER BACK';
+    }
+
+    return Row(children: [
+      _AssistButton(
+        title: 'WHEELIE',
+        subtitle: on == null ? 'READING…' : (compact ? (on ? 'ON' : 'OFF') : (on ? 'LIMITER ON' : 'LIMITER OFF')),
+        enabled: wheelieEnabled,
+        compact: compact,
+        selected: on == true,
+        onTap: onToggleLimiter,
+      ),
+      const SizedBox(width: 12),
+      _AssistButton(
+        title: title,
+        subtitle: sub,
+        enabled: launchEnabled,
+        compact: compact,
+        bigTitle: phase == LaunchPhase.active,
+        fill: fill,
+        border: border,
+        fg: fg,
+        progress: progress,
+        onTap: onLaunchTap,
+      ),
     ]);
   }
 
@@ -267,6 +352,84 @@ class _ModeCard extends StatelessWidget {
                   letterSpacing: 2)),
         ),
       ),
+      ),
+    );
+  }
+}
+
+/// Card-style button with a title and a small caption. Used for the WHEELIE / LAUNCH pair.
+class _AssistButton extends StatelessWidget {
+  final String title, subtitle;
+  final bool enabled, compact, selected, bigTitle;
+  final Color? fill, border, fg; // override colours (launch states); null = default look
+  final double? progress; // 0..1 bar along the bottom, or null
+  final VoidCallback onTap;
+  const _AssistButton({
+    required this.title,
+    required this.subtitle,
+    required this.enabled,
+    required this.compact,
+    required this.onTap,
+    this.selected = false,
+    this.bigTitle = false,
+    this.fill,
+    this.border,
+    this.fg,
+    this.progress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    final bg = fill ?? (selected ? accent.withValues(alpha: 0.15) : const Color(0xFF14181D));
+    final edge = border ?? (selected ? accent : Colors.white12);
+    final text = fg ?? (selected ? accent : Colors.white70);
+    final subText = fg != null ? fg!.withValues(alpha: 0.75) : (selected ? accent.withValues(alpha: 0.8) : Colors.white38);
+    return Expanded(
+      child: Opacity(
+        opacity: enabled ? 1 : 0.35,
+        child: GestureDetector(
+          onTap: enabled ? onTap : null,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            height: compact ? 44 : 54,
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: edge, width: 1.5),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(children: [
+              Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Text(title,
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.fade,
+                      style: TextStyle(
+                          fontSize: bigTitle ? (compact ? 18 : 22) : (compact ? 13 : 15),
+                          fontWeight: FontWeight.w700,
+                          color: text,
+                          letterSpacing: bigTitle ? 0.5 : 2)),
+                  if (!compact || !bigTitle)
+                    Text(subtitle,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.fade,
+                        style: TextStyle(fontSize: 9, color: subText, letterSpacing: 1)),
+                ]),
+              ),
+              if (progress != null)
+                Align(
+                  alignment: Alignment.bottomLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: progress!.clamp(0.0, 1.0),
+                    child: Container(height: 4, color: const Color(0x8C0B0D10)),
+                  ),
+                ),
+            ]),
+          ),
+        ),
       ),
     );
   }

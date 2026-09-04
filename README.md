@@ -54,8 +54,10 @@ Control unlocks in tiers; the dashboard **reads** everything (telemetry, ride mo
 tier. Full setup detail: **[docs/setup-hardware-software.md](docs/setup-hardware-software.md)**.
 
 - **Tier 1 — stock bike, no changes:** live merged BMS + controller telemetry, live mode + gear
-  read-out, and the terminal-exposed tuning (traction control, wheel-lift limiter). Control buttons
-  are inert (the controller takes mode/gear only as CAN frames from the display).
+  read-out, and **wheel-lift limiter control** — a WHEELIE on/off toggle plus a timed LAUNCH
+  button that holds the front down for the first seconds of a hard launch
+  ([docs/wheel-lift-control.md](docs/wheel-lift-control.md)). Mode/gear buttons are inert (the
+  controller takes those only as CAN frames from the display).
 - **Tier 2 — CAN-RX injector firmware** (small, reversible, documented in **x7-vesc**): ride
   **mode** becomes fully controllable and sticks; gear can be sent but a connected display
   overwrites it.
@@ -74,11 +76,15 @@ with a connector (no re-flash), so nothing here is a one-way door.
 
 ## Status & roadmap
 
-Working dashboard: dual-BLE (BMS + controller) telemetry, ride-mode control, and gear control
-(with the injector firmware; see [setup](docs/setup-hardware-software.md)). Verified on an
-X-9000 V3.
+Working dashboard: dual-BLE (BMS + controller) telemetry, ride-mode control, gear control
+(with the injector firmware; see [setup](docs/setup-hardware-software.md)), and wheel-lift limiter
+control (stock firmware). Verified on an X-9000 V3.
 
 **Status of features**
+- **Wheel-lift limiter (WHEELIE / LAUNCH): new, not yet tested on a bike.** The commands and
+  read-back are the controller's own (documented in x7-vesc); the state machine is unit-tested
+  with a fake link. Bench it wheel-off-ground first; the motion threshold (500 ERPM) and the
+  default start angle still want tuning.
 - **Speed (MPH / KM-H): early success, not thoroughly tested.** Now reads the controller's own
   firmware-computed road speed (from `GET_VALUES_SETUP`), not a stub — it looked correct in initial
   on-bike testing. Still needs a proper GPS/known-speed check across the range before it's trusted.

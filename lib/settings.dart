@@ -1,5 +1,5 @@
 // User settings: persisted with shared_preferences, exposed as a ChangeNotifier.
-// Covers units (metric/imperial), keep-screen-on, and per-role device selection.
+// Covers units (metric/imperial), keep-screen-on, launch assist, and per-role device selection.
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +7,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 class Settings extends ChangeNotifier {
   bool imperial = false; // false = °C / km-h ; true = °F / mph
   bool keepScreenOn = false;
+
+  // Launch assist: how long the wheel-lift limiter stays on after the wheel starts turning,
+  // and an optional lower start angle for that window only.
+  static const int launchWindowMin = 2, launchWindowMax = 15;
+  static const int launchStartMin = 5, launchStartMax = 30;
+  int launchWindowS = 5;
+  bool launchStartOverride = false;
+  int launchStartDeg = 12;
 
   // roleId (from device_profiles) -> chosen device remoteId. null / missing = auto (first match).
   final Map<String, String> _devices = {};
@@ -17,6 +25,9 @@ class Settings extends ChangeNotifier {
     _p = await SharedPreferences.getInstance();
     imperial = _p!.getBool('imperial') ?? false;
     keepScreenOn = _p!.getBool('keepScreenOn') ?? false;
+    launchWindowS = (_p!.getInt('launchWindowS') ?? 5).clamp(launchWindowMin, launchWindowMax);
+    launchStartOverride = _p!.getBool('launchStartOverride') ?? false;
+    launchStartDeg = (_p!.getInt('launchStartDeg') ?? 12).clamp(launchStartMin, launchStartMax);
     for (final k in _p!.getKeys()) {
       if (k.startsWith('dev.')) {
         final v = _p!.getString(k);
@@ -35,6 +46,24 @@ class Settings extends ChangeNotifier {
   void setKeepScreenOn(bool v) {
     keepScreenOn = v;
     _p?.setBool('keepScreenOn', v);
+    notifyListeners();
+  }
+
+  void setLaunchWindowS(int v) {
+    launchWindowS = v.clamp(launchWindowMin, launchWindowMax);
+    _p?.setInt('launchWindowS', launchWindowS);
+    notifyListeners();
+  }
+
+  void setLaunchStartOverride(bool v) {
+    launchStartOverride = v;
+    _p?.setBool('launchStartOverride', v);
+    notifyListeners();
+  }
+
+  void setLaunchStartDeg(int v) {
+    launchStartDeg = v.clamp(launchStartMin, launchStartMax);
+    _p?.setInt('launchStartDeg', launchStartDeg);
     notifyListeners();
   }
 
