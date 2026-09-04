@@ -3,6 +3,7 @@
 // selection from Settings, and switches device when the selection changes.
 
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -44,11 +45,17 @@ class ConnectionManager {
   }
 
   Future<void> start() async {
-    await [
-      Permission.bluetoothScan,
-      Permission.bluetoothConnect,
-      Permission.locationWhenInUse,
-    ].request();
+    // iOS has one Bluetooth permission. Android 12+ splits it into scan + connect, and
+    // older Android needs location to scan. Asking iOS for location would show an
+    // unwanted prompt.
+    final perms = Platform.isIOS
+        ? <Permission>[Permission.bluetooth]
+        : <Permission>[
+            Permission.bluetoothScan,
+            Permission.bluetoothConnect,
+            Permission.locationWhenInUse,
+          ];
+    await perms.request();
     _adapterSub = FlutterBluePlus.adapterState.listen((s) {
       log('adapter: $s');
       if (s == BluetoothAdapterState.on) _begin();

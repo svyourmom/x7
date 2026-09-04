@@ -37,6 +37,11 @@ required to download those).
   Uninstall, or `adb uninstall com.svyourmom.x7`) before installing a newer one. This resets the
   app's saved settings.
 
+**iPhone:** each release also carries an **unsigned** `.ipa`, built on a macOS runner from the same
+source. iOS will not install it as-is: sign it with your own (free) Apple ID and sideload it with
+Xcode, AltStore, or Sideloadly. How-to and caveats: [docs/ios.md](docs/ios.md). There is no App
+Store or TestFlight listing.
+
 Read [Safety](#safety) before connecting to a bike.
 
 ## Companion references
@@ -70,7 +75,8 @@ with a connector (no re-flash), so nothing here is a one-way door.
 
 ## Tech
 
-- **Flutter** (Android first; iOS later from the same codebase).
+- **Flutter** (Android first; iOS builds from the same codebase as an unsigned IPA, see
+  [docs/ios.md](docs/ios.md)).
 - BLE via `flutter_blue_plus` — **two simultaneous connections** (BMS + controller).
 - VESC packet protocol (framing + CRC-16/XMODEM), ported from the reference tools.
 
@@ -81,6 +87,8 @@ Working dashboard: dual-BLE (BMS + controller) telemetry, ride-mode control, gea
 control (stock firmware). Verified on an X-9000 V3.
 
 **Status of features**
+- **iOS: builds in CI, not yet run on a phone or a bike.** Same Bluetooth stack as Android;
+  install is by sideloading only ([docs/ios.md](docs/ios.md)).
 - **Wheel-lift limiter (WHEELIE / LAUNCH): new, not yet tested on a bike.** The commands and
   read-back are the controller's own (documented in x7-vesc); the state machine is unit-tested
   with a fake link. Bench it wheel-off-ground first; the motion threshold (500 ERPM) and the

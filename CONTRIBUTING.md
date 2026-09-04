@@ -14,6 +14,10 @@ flutter build apk        # release/debug APK to sideload
 
 You need a real phone with Bluetooth — an emulator has no BLE radio, so it can't talk to the bike.
 
+For iPhone: a Mac with Xcode and a free Apple ID (set your Team in `ios/Runner.xcworkspace`, then
+`flutter run`). `flutter build ios --release --no-codesign` is what CI runs and needs no Apple ID.
+The iOS Simulator has no Bluetooth either. See [docs/ios.md](docs/ios.md).
+
 ## Where things are
 
 - `lib/ble/vesc_protocol.dart` — VESC framing + CRC-16/XMODEM + payload builders (pure Dart, unit-testable).

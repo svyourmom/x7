@@ -1,9 +1,9 @@
 name: build
 
 # Builds x7 entirely on GitHub runners -- no local machine is involved.
-# Every push/PR produces a universal release APK as a workflow artifact; pushing a
-# v* tag additionally cuts a GitHub Release with the APK attached (Release assets are
-# publicly downloadable, workflow artifacts are not).
+# Every push/PR produces a universal release APK and an unsigned iOS IPA as workflow
+# artifacts; pushing a v* tag additionally cuts a GitHub Release with both attached
+# (Release assets are publicly downloadable, workflow artifacts are not).
 on:
   push:
     branches: [main]
@@ -56,8 +56,6 @@ jobs:
   build:
     name: universal release APK
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # only needed by the release step
     steps:
       - uses: actions/checkout@v4
 
@@ -113,14 +111,81 @@ jobs:
           path: ${{ steps.apk.outputs.path }}
           if-no-files-found: error
 
-      - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+  # Unsigned: the runner has no Apple certificate. `flutter build ipa --no-codesign`
+  # deliberately skips the .ipa step, so build the .app and wrap it in the Payload/ zip
+  # layout ourselves. Users re-sign it with their own Apple ID -- see docs/ios.md.
+  build-ios:
+    name: unsigned iOS IPA
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
         with:
-          files: ${{ steps.apk.outputs.path }}
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter doctor -v
+
+      - run: flutter pub get
+
+      - name: Derive version
+        id: ver
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            echo "name_arg=--build-name=$version" >> "$GITHUB_OUTPUT"
+          else
+            version=$(sed -n 's/^version:[[:space:]]*\([^+]*\).*/\1/p' pubspec.yaml | head -1)
+            echo "name_arg=" >> "$GITHUB_OUTPUT"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build unsigned iOS app
+        run: |
+          flutter build ios --release --no-codesign \
+            --build-number=${{ github.run_number }} \
+            ${{ steps.ver.outputs.name_arg }}
+
+      - name: Package unsigned IPA
+        id: ipa
+        run: |
+          name="x7-${{ steps.ver.outputs.version }}-build${{ github.run_number }}-$(git rev-parse --short HEAD)-unsigned.ipa"
+          mkdir Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qry "$name" Payload
+          ls -lh "$name"
+          echo "path=$name" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: x7-ipa
+          path: ${{ steps.ipa.outputs.path }}
+          if-no-files-found: error
+
+  # One job publishes both files so two builds never race to create the same Release.
+  release:
+    name: GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, build-ios]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: x7-*
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            *.apk
+            *.ipa
           generate_release_notes: true
           body: |
-            Universal APK (arm64-v8a + armeabi-v7a + x86_64) -- one file, installs on
+            **Android:** universal APK (arm64-v8a + armeabi-v7a + x86_64) -- one file, installs on
             essentially any Android device.
 
             **Installing:** you'll need to allow installing from unknown sources, and
@@ -131,4 +196,8 @@ jobs:
             the signature matches, so to install a newer x7 over an older one you must
             uninstall the old one first (Settings -> Apps -> x7 -> Uninstall, or
             `adb uninstall com.svyourmom.x7`). This resets the app's saved settings.
+
+            **iOS:** the `-unsigned.ipa` carries no Apple signature, so an iPhone will not
+            install it as-is. Sign it with your own Apple ID and sideload it (Xcode,
+            AltStore, or Sideloadly) -- see `docs/ios.md`.
           fail_on_unmatched_files: true

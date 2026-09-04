@@ -6,6 +6,7 @@ GPLv3 — see the top-level `LICENSE`).
 - [architecture.md](architecture.md) — data flow, the two BLE clients, the merged model.
 - [protocol-port.md](protocol-port.md) — mapping the reference Python to the Dart implementation.
 - [ui-spec.md](ui-spec.md) — the Stark-Varg-inspired dashboard direction.
+- [ios.md](ios.md) — building x7 for iPhone and sideloading the unsigned IPA from CI.
 - [wheel-lift-control.md](wheel-lift-control.md) — the WHEELIE toggle and the timed LAUNCH button
   for the controller's wheel-lift limiter, every operating configuration, and what happens when
   things go wrong.
